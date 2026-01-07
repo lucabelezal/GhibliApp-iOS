@@ -64,6 +64,8 @@ struct FilmDetailView: View {
             .task {
                 await viewModel.refreshAllSections()
             }
+            .scrollClipDisabled()
+            .ignoresSafeArea(edges: .top)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -76,18 +78,8 @@ struct FilmDetailView: View {
                 }
             }
         }
-    }
-
-    private var fallbackBanner: some View {
-        ZStack {
-            Color.gray.opacity(0.3)
-            VStack(spacing: 8) {
-                Image(systemName: "photo")
-                    .font(.largeTitle)
-                Text("Imagem indisponível")
-            }
-            .foregroundStyle(.secondary)
-        }
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     // MARK: - Parallax Header
@@ -96,6 +88,20 @@ struct FilmDetailView: View {
         let height: CGFloat
         var title: String?
 
+        private var headerPlaceholder: some View {
+            Color.gray.opacity(0.25)
+                .overlay(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.05),
+                            Color.black.opacity(0.1),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+
         var body: some View {
             GeometryReader { geo in
                 let minY = geo.frame(in: .named("filmScroll")).minY
@@ -103,22 +109,26 @@ struct FilmDetailView: View {
                 ZStack(alignment: .bottomLeading) {
                     Group {
                         if let url {
-                            AsyncImage(url: url) { phase in
+                            AsyncImage(
+                                url: url,
+                                transaction: Transaction(animation: .easeInOut(duration: 0.35))
+                            ) { phase in
                                 switch phase {
                                 case .success(let image):
                                     image
                                         .resizable()
                                         .scaledToFill()
+                                        .transition(.opacity)
                                 case .failure:
-                                    Color.gray.opacity(0.3)
+                                    headerPlaceholder
                                 case .empty:
-                                    ShimmerView()
+                                    headerPlaceholder
                                 @unknown default:
-                                    Color.gray.opacity(0.3)
+                                    headerPlaceholder
                                 }
                             }
                         } else {
-                            Color.gray.opacity(0.3)
+                            headerPlaceholder
                         }
                     }
                     .frame(width: geo.size.width, height: headerHeight)

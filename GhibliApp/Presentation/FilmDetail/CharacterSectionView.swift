@@ -9,16 +9,11 @@ struct CharacterSectionView: View {
             title: "Personagens principais",
             state: viewModel.state,
             emptyMessage: "Sem personagens listados",
-            accentGradient: LinearGradient(
-                colors: [
-                    Color(red: 0.90, green: 0.84, blue: 0.98),
-                    Color(red: 0.94, green: 0.88, blue: 1.00),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            placeholderCount: 3
         ) { person in
             CharacterCard(person: person)
+        } placeholderBuilder: {
+            CharacterCardShimmer()
         }
         .task {
             await viewModel.load()
@@ -104,6 +99,72 @@ private struct CharacterCard: View {
         let iconName: String
         let label: String
         let value: String
+    }
+}
+
+private struct CharacterCardShimmer: View {
+    private let infoColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 10, alignment: .leading), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                ShimmerView()
+                    .frame(height: 16)
+                    .frame(maxWidth: 170)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                ShimmerView()
+                    .frame(height: 16)
+                    .frame(maxWidth: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+
+            Divider()
+                .opacity(0.2)
+
+            LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
+                ForEach(0..<4, id: \.self) { _ in
+                    CharacterTraitShimmer()
+                }
+            }
+        }
+        .padding(16)
+        .frame(
+            width: FilmDetailCardMetrics.size.width,
+            height: FilmDetailCardMetrics.size.height,
+            alignment: .topLeading
+        )
+        .background(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct CharacterTraitShimmer: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                ShimmerView()
+                    .frame(width: 14, height: 14)
+                    .clipShape(Circle())
+
+                ShimmerView()
+                    .frame(height: 10)
+                    .frame(maxWidth: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+
+            ShimmerView()
+                .frame(height: 12)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

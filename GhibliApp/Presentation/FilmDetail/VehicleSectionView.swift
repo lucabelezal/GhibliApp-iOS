@@ -8,16 +8,11 @@ struct VehicleSectionView: View {
             title: "Veículos e máquinas",
             state: viewModel.state,
             emptyMessage: "Nenhum veículo listado",
-            accentGradient: LinearGradient(
-                colors: [
-                    Color(red: 1.00, green: 0.89, blue: 0.86),
-                    Color(red: 0.99, green: 0.92, blue: 0.80),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            placeholderCount: 3
         ) { vehicle in
             VehicleCard(vehicle: vehicle)
+        } placeholderBuilder: {
+            VehicleCardShimmer()
         }
         .task {
             await viewModel.load()
@@ -79,6 +74,73 @@ private struct VehicleCard: View {
     private var descriptionText: String? {
         let trimmed = vehicle.description.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private struct VehicleCardShimmer: View {
+    private let infoColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ShimmerView()
+                .frame(height: 16)
+                .frame(maxWidth: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(0..<3, id: \.self) { _ in
+                    ShimmerView()
+                        .frame(height: 10)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider()
+                .opacity(0.2)
+
+            LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
+                ForEach(0..<2, id: \.self) { _ in
+                    VehicleTraitShimmer()
+                }
+            }
+        }
+        .padding(16)
+        .frame(
+            width: FilmDetailCardMetrics.size.width,
+            height: FilmDetailCardMetrics.size.height,
+            alignment: .topLeading
+        )
+        .background(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct VehicleTraitShimmer: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                ShimmerView()
+                    .frame(width: 14, height: 14)
+                    .clipShape(Circle())
+                ShimmerView()
+                    .frame(height: 10)
+                    .frame(maxWidth: 70)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+
+            ShimmerView()
+                .frame(height: 12)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

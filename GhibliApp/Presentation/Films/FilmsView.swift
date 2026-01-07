@@ -4,6 +4,7 @@ struct FilmsView: View {
     @State private var isRefreshing = false
     @Bindable var viewModel: FilmsViewModel
     let openDetail: (Film) -> Void
+    private let shimmerPlaceholderCount = 6
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -36,19 +37,21 @@ struct FilmsView: View {
 
                 switch viewModel.state.status {
                 case .idle, .loading:
-                    LoadingView()
+                    FilmListShimmers(count: shimmerPlaceholderCount)
                         .padding(.top, 16)
-                    
+
                 case .error(let message):
                     ErrorView(message: message, retryTitle: "Tentar novamente") {
                         Task { await viewModel.load(forceRefresh: true) }
                     }
                     .padding(.top, 24)
-                    
+
                 case .empty:
-                    EmptyStateView(title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde")
-                        .padding(.top, 24)
-                    
+                    EmptyStateView(
+                        title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde"
+                    )
+                    .padding(.top, 24)
+
                 case .loaded:
                     ForEach(viewModel.state.films, id: \.id) { film in
                         VStack(spacing: 0) {
@@ -58,7 +61,9 @@ struct FilmsView: View {
                                 FilmRowView(
                                     film: film,
                                     isFavorite: viewModel.isFavorite(film),
-                                    onToggleFavorite: { Task { await viewModel.toggleFavorite(film) } }
+                                    onToggleFavorite: {
+                                        Task { await viewModel.toggleFavorite(film) }
+                                    }
                                 )
                                 .padding(.vertical, 16)
                             }
@@ -88,6 +93,25 @@ struct FilmsView: View {
             }
             .transition(.move(edge: .top).combined(with: .opacity))
             .animation(.spring(), value: snackbarState)
+        }
+    }
+}
+
+private struct FilmListShimmers: View {
+    let count: Int
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+                VStack(spacing: 0) {
+                    FilmRowShimmerView()
+                        .padding(.vertical, 16)
+
+                    if index != count - 1 {
+                        Divider()
+                    }
+                }
+            }
         }
     }
 }

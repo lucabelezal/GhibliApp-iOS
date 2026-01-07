@@ -1,11 +1,29 @@
 import SwiftUI
 
-struct FilmDetailCarouselSectionView<Item, Content>: View where Item: Identifiable, Content: View {
+struct FilmDetailCarouselSectionView<Item, Content, Placeholder>: View
+where Item: Identifiable, Content: View, Placeholder: View {
     let title: String
     let state: SectionState<Item>
     let emptyMessage: String
-    let accentGradient: LinearGradient
+    let placeholderCount: Int
     let contentBuilder: (Item) -> Content
+    let placeholderBuilder: () -> Placeholder
+
+    init(
+        title: String,
+        state: SectionState<Item>,
+        emptyMessage: String,
+        placeholderCount: Int = 3,
+        @ViewBuilder contentBuilder: @escaping (Item) -> Content,
+        @ViewBuilder placeholderBuilder: @escaping () -> Placeholder
+    ) {
+        self.title = title
+        self.state = state
+        self.emptyMessage = emptyMessage
+        self.placeholderCount = placeholderCount
+        self.contentBuilder = contentBuilder
+        self.placeholderBuilder = placeholderBuilder
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -17,8 +35,8 @@ struct FilmDetailCarouselSectionView<Item, Content>: View where Item: Identifiab
             case .loading:
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 16) {
-                        ForEach(0..<3) { _ in
-                            FilmDetailCarouselSkeletonCard(accentGradient: accentGradient)
+                        ForEach(0..<placeholderCount, id: \.self) { _ in
+                            placeholderBuilder()
                         }
                     }
                     .padding(.vertical, 4)
@@ -37,54 +55,11 @@ struct FilmDetailCarouselSectionView<Item, Content>: View where Item: Identifiab
                 SectionPlaceholderView(message: message)
             case .empty:
                 SectionPlaceholderView(message: emptyMessage)
-            default:
+            case .idle:
                 EmptyView()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.3), value: state.status)
-    }
-}
-
-private struct FilmDetailCarouselSkeletonCard: View {
-    let accentGradient: LinearGradient
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ShimmerView()
-                .frame(height: 18)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-
-            ForEach(0..<4, id: \.self) { _ in
-                HStack(spacing: 10) {
-                    ShimmerView()
-                        .frame(width: 18, height: 18)
-                        .clipShape(Circle())
-
-                    ShimmerView()
-                        .frame(height: 12)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-            }
-        }
-        .padding(16)
-        .frame(
-            width: FilmDetailCardMetrics.size.width,
-            height: FilmDetailCardMetrics.size.height,
-            alignment: .topLeading
-        )
-        .background(
-            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(
-                        cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous
-                    )
-                    .stroke(accentGradient, lineWidth: 0.6)
-                    .opacity(0.25)
-                )
-        )
     }
 }

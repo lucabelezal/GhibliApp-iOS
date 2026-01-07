@@ -8,20 +8,88 @@ struct SpeciesSectionView: View {
             title: "Espécies em destaque",
             state: viewModel.state,
             emptyMessage: "Nenhuma espécie encontrada para esse filme",
-            accentGradient: LinearGradient(
-                colors: [
-                    Color(red: 0.99, green: 0.90, blue: 0.85),
-                    Color(red: 0.93, green: 0.87, blue: 0.97),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            placeholderCount: 3
         ) { species in
             SpeciesCard(species: species)
+        } placeholderBuilder: {
+            SpeciesCardShimmer()
         }
         .task {
             await viewModel.load()
         }
+    }
+}
+
+private struct SpeciesCardShimmer: View {
+    private let infoColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ShimmerView()
+                .frame(height: 16)
+                .frame(maxWidth: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            TagGroupShimmer()
+
+            Divider()
+                .opacity(0.2)
+
+            LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
+                ForEach(0..<2, id: \.self) { _ in
+                    SpeciesTraitShimmer()
+                }
+            }
+        }
+        .padding(16)
+        .frame(
+            width: FilmDetailCardMetrics.size.width,
+            height: FilmDetailCardMetrics.size.height,
+            alignment: .topLeading
+        )
+        .background(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct TagGroupShimmer: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { _ in
+                ShimmerView()
+                    .frame(width: 60, height: 18)
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SpeciesTraitShimmer: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                ShimmerView()
+                    .frame(width: 14, height: 14)
+                    .clipShape(Circle())
+                ShimmerView()
+                    .frame(height: 10)
+                    .frame(maxWidth: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+
+            ShimmerView()
+                .frame(height: 12)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

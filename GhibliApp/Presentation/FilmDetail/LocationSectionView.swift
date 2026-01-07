@@ -8,16 +8,11 @@ struct LocationSectionView: View {
             title: "Locais visitados",
             state: viewModel.state,
             emptyMessage: "Sem locais cadastrados para esse filme",
-            accentGradient: LinearGradient(
-                colors: [
-                    Color(red: 0.78, green: 0.91, blue: 0.97),
-                    Color(red: 0.70, green: 0.84, blue: 0.92),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            placeholderCount: 3
         ) { location in
             LocationCard(location: location)
+        } placeholderBuilder: {
+            LocationCardShimmer()
         }
         .task {
             await viewModel.load()
@@ -110,6 +105,86 @@ private struct LocationCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+private struct LocationCardShimmer: View {
+    private let infoColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                ShimmerView()
+                    .frame(height: 16)
+                    .frame(maxWidth: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                ShimmerView()
+                    .frame(height: 14)
+                    .frame(maxWidth: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+
+            TagGroupShimmer()
+
+            Divider()
+                .opacity(0.2)
+
+            LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
+                ForEach(0..<3, id: \.self) { _ in
+                    LocationTraitShimmer()
+                }
+            }
+        }
+        .padding(16)
+        .frame(
+            width: FilmDetailCardMetrics.size.width,
+            height: FilmDetailCardMetrics.size.height,
+            alignment: .topLeading
+        )
+        .background(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct TagGroupShimmer: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { _ in
+                ShimmerView()
+                    .frame(width: 70, height: 18)
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct LocationTraitShimmer: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                ShimmerView()
+                    .frame(width: 14, height: 14)
+                    .clipShape(Circle())
+                ShimmerView()
+                    .frame(height: 10)
+                    .frame(maxWidth: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+
+            ShimmerView()
+                .frame(height: 12)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
