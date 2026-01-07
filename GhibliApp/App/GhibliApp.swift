@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct GhibliApp: App {
+    private let container = AppContainer.shared
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView(router: container.router, container: container)
         }
     }
 }
