@@ -4,66 +4,78 @@ struct FilmDetailView: View {
     @Bindable var viewModel: FilmDetailViewModel
 
     var body: some View {
-        ScrollView(.vertical) {
-            VStack(spacing: 24) {
-                parallaxHeader
-                filmInfo
-                charactersSection
+        ZStack(alignment: .top) {
+            LiquidGlassBackground()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    ParallaxHeader(
+                        url: viewModel.film.bannerURL, height: 320, title: viewModel.film.title
+                    )
+                    .frame(maxWidth: .infinity)
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Title is shown in the header; keep a small spacer here.
+
+                        // Info card full-width
+                        VStack(alignment: .leading, spacing: 12) {
+                            InfoRow(label: "Director", value: viewModel.film.director)
+                            InfoRow(label: "Producer", value: viewModel.film.producer)
+                            InfoRow(label: "Release Year", value: viewModel.film.releaseYear)
+                            InfoRow(label: "Duration", value: "\(viewModel.film.duration) min")
+                            InfoRow(label: "Score", value: "\(viewModel.film.score)/100")
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                        )
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Synopsis")
+                                .font(.headline)
+
+                            Text(viewModel.film.synopsis)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        CharacterSectionView(viewModel: viewModel.charactersSectionViewModel)
+
+                        LocationSectionView(viewModel: viewModel.locationsSectionViewModel)
+
+                        SpeciesSectionView(viewModel: viewModel.speciesSectionViewModel)
+
+                        VehicleSectionView(viewModel: viewModel.vehiclesSectionViewModel)
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.bottom, 40)
             }
-            .padding(.bottom, 80)
+            .coordinateSpace(name: "filmScroll")
+            .refreshable {
+                await viewModel.refreshAllSections(forceRefresh: true)
+            }
+            .task {
+                await viewModel.refreshAllSections()
+            }
         }
-        .ignoresSafeArea(edges: .top)
-        .background(LiquidGlassBackground())
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await viewModel.toggleFavorite() }
                 } label: {
                     Image(systemName: viewModel.state.isFavorite ? "heart.fill" : "heart")
+                        .foregroundStyle(
+                            viewModel.state.isFavorite ? Color.yellow : Color.secondary)
                 }
             }
         }
-        .task {
-            await viewModel.load()
-        }
-    }
-
-    private var parallaxHeader: some View {
-        GeometryReader { proxy in
-            let minY = proxy.frame(in: .global).minY
-            let height = max(minY > 0 ? 300 + minY : 300, 200)
-
-            ZStack(alignment: .bottomLeading) {
-                AsyncImage(url: viewModel.film.bannerURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        fallbackBanner
-                    case .empty:
-                        ShimmerView()
-                    @unknown default:
-                        fallbackBanner
-                    }
-                }
-                .frame(height: height)
-                .clipped()
-                .overlay(
-                    LinearGradient(colors: [.black.opacity(0.6), .clear], startPoint: .bottom, endPoint: .top)
-                )
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(viewModel.film.title)
-                        .font(.largeTitle.bold())
-                }
-                .padding()
-                .foregroundStyle(.white)
-            }
-            .offset(y: minY > 0 ? -minY : 0)
-        }
-        .frame(height: 300)
     }
 
     private var fallbackBanner: some View {
@@ -78,72 +90,70 @@ struct FilmDetailView: View {
         }
     }
 
-    private var filmInfo: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(viewModel.film.releaseYear, systemImage: "calendar")
-                Label("\(viewModel.film.duration) min", systemImage: "clock")
-                Label("Nota \(viewModel.film.score)", systemImage: "star")
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+    // MARK: - Parallax Header
+    private struct ParallaxHeader: View {
+        let url: URL?
+        let height: CGFloat
+        var title: String?
 
-            Text(viewModel.film.synopsis)
-                .font(.body)
-        }
-        .padding(.horizontal)
-    }
+        var body: some View {
+            GeometryReader { geo in
+                let minY = geo.frame(in: .named("filmScroll")).minY
+                let headerHeight = minY > 0 ? height + minY : height
+                ZStack(alignment: .bottomLeading) {
+                    Group {
+                        if let url {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .failure:
+                                    Color.gray.opacity(0.3)
+                                case .empty:
+                                    ShimmerView()
+                                @unknown default:
+                                    Color.gray.opacity(0.3)
+                                }
+                            }
+                        } else {
+                            Color.gray.opacity(0.3)
+                        }
+                    }
+                    .frame(width: geo.size.width, height: headerHeight)
+                    .clipped()
 
-    @ViewBuilder
-    private var charactersSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Personagens")
-                .font(.title2.bold())
-                .padding(.horizontal)
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: .clear, location: 0.0),
+                                    .init(color: .clear, location: 0.45),
+                                    .init(color: .black.opacity(0.75), location: 1.0),
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: geo.size.width, height: headerHeight)
+                        .allowsHitTesting(false)
 
-            switch viewModel.state.status {
-            case .loading:
-                LoadingView(count: 3)
-            case .error(let message):
-                ErrorView(message: message, retryTitle: "Recarregar") {
-                    Task { await viewModel.load(forceRefresh: true) }
-                }
-            case .empty:
-                EmptyStateView(title: "Sem personagens", subtitle: "Nenhum personagem relacionado foi encontrado")
-            case .loaded, .idle:
-                VStack(spacing: 12) {
-                    ForEach(viewModel.state.characters, id: \.id) { person in
-                        characterRow(person)
+                    // Title overlay
+                    if let title {
+                        Text(title)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 24)
                     }
                 }
-                .padding(.horizontal)
+                .offset(y: minY > 0 ? -minY : 0)
             }
+            .frame(height: height)
+            .ignoresSafeArea(edges: .top)
         }
-    }
-
-    private func characterRow(_ person: Person) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(person.name)
-                .font(.headline)
-            HStack {
-                infoBadge(title: "Gênero", value: person.gender)
-                infoBadge(title: "Idade", value: person.age)
-            }
-            HStack {
-                infoBadge(title: "Olhos", value: person.eyeColor)
-                infoBadge(title: "Cabelo", value: person.hairColor)
-            }
-        }
-        .padding()
-        .glassBackground()
-    }
-
-    private func infoBadge(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.callout)
-        }
-        .padding(8)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

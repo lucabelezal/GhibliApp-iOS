@@ -1,0 +1,115 @@
+import SwiftUI
+
+struct VehicleSectionView: View {
+    @Bindable var viewModel: FilmDetailSectionViewModel<Vehicle>
+
+    var body: some View {
+        FilmDetailCarouselSectionView(
+            title: "Veículos e máquinas",
+            state: viewModel.state,
+            emptyMessage: "Nenhum veículo listado",
+            accentGradient: LinearGradient(
+                colors: [
+                    Color(red: 1.00, green: 0.89, blue: 0.86),
+                    Color(red: 0.99, green: 0.92, blue: 0.80),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        ) { vehicle in
+            VehicleCard(vehicle: vehicle)
+        }
+        .task {
+            await viewModel.load()
+        }
+    }
+}
+
+private struct VehicleCard: View {
+    let vehicle: Vehicle
+    private let infoColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(vehicle.name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+
+            if let summary = descriptionText {
+                Text(summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(5)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+                .opacity(0.2)
+
+            LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
+                ForEach(infoRows) { item in
+                    VehicleTraitTile(icon: item.icon, label: item.label, value: item.value)
+                }
+            }
+        }
+        .padding(16)
+        .frame(
+            width: FilmDetailCardMetrics.size.width,
+            height: FilmDetailCardMetrics.size.height,
+            alignment: .topLeading
+        )
+        .background(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var infoRows: [VehicleTrait] {
+        [
+            VehicleTrait(icon: "speedometer", label: "Classe", value: vehicle.vehicleClass),
+            VehicleTrait(icon: "ruler", label: "Comprimento", value: vehicle.length),
+        ]
+    }
+
+    private var descriptionText: String? {
+        let trimmed = vehicle.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private struct VehicleTraitTile: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(.secondary)
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(value.capitalized)
+                .font(.caption2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct VehicleTrait: Identifiable {
+    let id = UUID()
+    let icon: String
+    let label: String
+    let value: String
+}

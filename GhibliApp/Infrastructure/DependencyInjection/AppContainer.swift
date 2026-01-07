@@ -8,6 +8,9 @@ final class AppContainer {
     let favoritesController: FavoritesController
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let fetchPeopleUseCase: FetchPeopleUseCase
+    private let fetchLocationsUseCase: FetchLocationsUseCase
+    private let fetchSpeciesUseCase: FetchSpeciesUseCase
+    private let fetchVehiclesUseCase: FetchVehiclesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let clearCacheUseCase: ClearCacheUseCase
@@ -18,19 +21,31 @@ final class AppContainer {
         let apiAdapter = GhibliAPIAdapter(client: apiClient)
         let cacheStore = SwiftDataCacheStore.shared
         let filmRepository: FilmRepository = FilmRepositoryImpl(api: apiAdapter, cache: cacheStore)
-        let peopleRepository: PeopleRepository = PeopleRepositoryImpl(api: apiAdapter, cache: cacheStore)
+        let peopleRepository: PeopleRepository = PeopleRepositoryImpl(
+            api: apiAdapter, cache: cacheStore)
+        let locationsRepository: LocationsRepository = LocationsRepositoryImpl(
+            api: apiAdapter, cache: cacheStore)
+        let speciesRepository: SpeciesRepository = SpeciesRepositoryImpl(
+            api: apiAdapter, cache: cacheStore)
+        let vehiclesRepository: VehiclesRepository = VehiclesRepositoryImpl(
+            api: apiAdapter, cache: cacheStore)
         let favoritesStore: FavoritesStoreAdapter = SwiftDataFavoritesStore()
         let favoritesService = FavoritesService(store: favoritesStore)
-        let favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(store: favoritesStore)
+        let favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(
+            store: favoritesStore)
         let cacheRepository: CacheRepository = CacheRepositoryImpl(cache: cacheStore)
         let connectivityRepository: ConnectivityRepository = ConnectivityMonitor()
 
         self.fetchFilmsUseCase = FetchFilmsUseCase(repository: filmRepository)
         self.fetchPeopleUseCase = FetchPeopleUseCase(repository: peopleRepository)
+        self.fetchLocationsUseCase = FetchLocationsUseCase(repository: locationsRepository)
+        self.fetchSpeciesUseCase = FetchSpeciesUseCase(repository: speciesRepository)
+        self.fetchVehiclesUseCase = FetchVehiclesUseCase(repository: vehiclesRepository)
         self.toggleFavoriteUseCase = ToggleFavoriteUseCase(repository: favoritesRepository)
         self.getFavoritesUseCase = GetFavoritesUseCase(repository: favoritesRepository)
         self.clearCacheUseCase = ClearCacheUseCase(repository: cacheRepository)
-        self.observeConnectivityUseCase = ObserveConnectivityUseCase(repository: connectivityRepository)
+        self.observeConnectivityUseCase = ObserveConnectivityUseCase(
+            repository: connectivityRepository)
 
         self.favoritesController = FavoritesController(service: favoritesService)
         self.router = AppRouter()
@@ -48,6 +63,9 @@ final class AppContainer {
         FilmDetailViewModel(
             film: film,
             fetchPeopleUseCase: fetchPeopleUseCase,
+            fetchLocationsUseCase: fetchLocationsUseCase,
+            fetchSpeciesUseCase: fetchSpeciesUseCase,
+            fetchVehiclesUseCase: fetchVehiclesUseCase,
             favoritesController: favoritesController
         )
     }

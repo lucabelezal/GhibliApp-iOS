@@ -22,7 +22,7 @@ final class FavoritesViewModel {
         state.status = .loading
         do {
             async let filmsTask = fetchFilmsUseCase.execute()
-            async let favoritesTask = favoritesController.load()
+            async let favoritesTask: Void = favoritesController.load()
             let films = try await filmsTask
             await favoritesTask
             let favoriteFilms = films.filter { favoritesController.isFavorite($0.id) }
