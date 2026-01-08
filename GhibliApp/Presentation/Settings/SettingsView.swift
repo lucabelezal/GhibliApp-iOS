@@ -115,7 +115,7 @@ struct SettingsView: View {
     }
 
     private func resetDialog(for content: SettingsViewContent) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Text("Limpar cache?")
                 .font(.headline)
             Text("Isso removerá os dados offline e favoritos salvos no dispositivo.")
@@ -131,8 +131,10 @@ struct SettingsView: View {
                 .disabled(content.isResettingCache)
             }
         }
-        .padding()
+        .padding(.vertical, 24)
         .glassBackground()
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
     }
 
     @ViewBuilder
