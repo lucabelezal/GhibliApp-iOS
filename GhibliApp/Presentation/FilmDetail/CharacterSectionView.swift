@@ -49,11 +49,11 @@ private struct CharacterCard: View {
         )
         .background(
             RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
-                .fill(Color.white)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
             RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
 
@@ -136,11 +136,11 @@ private struct CharacterCardPlaceholder: View {
         )
         .background(
             RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
-                .fill(Color.white)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
             RoundedRectangle(cornerRadius: FilmDetailCardMetrics.cornerRadius, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
 }
