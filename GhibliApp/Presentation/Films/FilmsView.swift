@@ -40,7 +40,8 @@ struct FilmsView: View {
             case .idle, .loading:
                 ForEach(0..<shimmerPlaceholderCount, id: \.self) { index in
                     FilmRowShimmerRow(
-                        isFirst: index == 0, isLast: index == shimmerPlaceholderCount - 1)
+                        isFirst: index == 0, isLast: index == shimmerPlaceholderCount - 1
+                    )
                 }
 
             case .error(let message):
@@ -73,6 +74,7 @@ struct FilmsView: View {
                                 }
                             )
                             .padding(.vertical, 16)
+                            .padding(.horizontal, 16)
                         }
                         .buttonStyle(.plain)
 
@@ -113,13 +115,11 @@ private struct FilmRowShimmerRow: View {
     var body: some View {
         VStack(spacing: 0) {
             FilmRowShimmerView()
+                .padding(.vertical, 16)
                 .padding(.horizontal, 16)
-                .padding(.top, isFirst ? 16 : 0)
-                .padding(.bottom, 16)
 
             if isLast == false {
                 Divider()
-                    .padding(.leading, 16)
             }
         }
         .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
