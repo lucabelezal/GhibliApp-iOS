@@ -17,7 +17,7 @@ struct FilmRepositoryImpl: FilmRepository {
             return cached.map(FilmMapper.map)
         }
 
-        let dtos: [FilmDTO] = try await client.request(with: GhibliEndpoint.films)
+        let dtos: [FilmDTO] = try await client.request(with: FilmEndpoint.list)
         try await cache.save(dtos, for: cacheKey)
         return dtos.map(FilmMapper.map)
     }

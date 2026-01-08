@@ -1,150 +1,355 @@
-Atue como um arquiteto iOS sênior especialista em SwiftUI, Clean Architecture,
-MVVM e Swift Concurrency (actors).
+# Prompt de Refatoração Arquitetural — SwiftUI
 
-OBJETIVO
-Quero que você ANALISE e, se necessário, REFATORE este projeto SwiftUI
-para seguir rigorosamente a arquitetura abaixo.
+## Papel do Modelo
 
-IMPORTANTE
-- Priorize correção arquitetural, não apenas funcionamento.
-- Se algo já estiver correto, NÃO mude sem justificativa.
-- Se houver violações, explique o problema e apresente a refatoração.
-- Use Swift moderno (iOS 17+).
-- Não utilize sufixos como "Impl".
-- Use `actor` somente onde indicado.
+Atue como um **arquiteto iOS sênior**, especialista em:
 
-----------------------------------------
-ARQUITETURA OBRIGATÓRIA
-----------------------------------------
+- SwiftUI
+- Clean Architecture
+- MVVM
+- Swift Concurrency (`actor`, `@MainActor`)
 
-CAMADAS:
+---
+
+## 🎯 OBJETIVO
+
+Analisar e, **se necessário**, refatorar este projeto SwiftUI para seguir **rigorosamente** a arquitetura definida abaixo.
+
+---
+
+## ⚠️ IMPORTANTE
+
+- Priorize **correção arquitetural**, não apenas funcionamento.
+- Se algo já estiver correto, **NÃO altere sem justificativa clara**.
+- Caso existam violações:
+  - Explique o problema
+  - Apresente a refatoração adequada
+- Utilize **Swift moderno (iOS 17+)**.
+- **Não utilize sufixos como `Impl`**.
+- Use `actor` **somente onde indicado**.
+
+---
+
+## 🧱 ARQUITETURA OBRIGATÓRIA
+
+### Camadas
+
 - Presentation
 - Domain
 - Data
 - Infrastructure
 - App (Composition Root)
 
-PADRÃO:
-- SwiftUI + MVVM na Presentation
+---
+
+### Padrões Arquiteturais
+
+- SwiftUI + MVVM na camada **Presentation**
 - Clean Architecture entre camadas
-- UseCases utilizam Repositories
-- Repositories e Services podem ser `actor`
-- Domain NÃO conhece implementação concreta
-- SwiftUI NÃO conhece Data nem Infrastructure
+- UseCases dependem de **Repositories**
+- Repositories e Services **podem ser `actor`**
+- Domain **não conhece implementações concretas**
+- SwiftUI **não conhece Data nem Infrastructure**
+- Data **pode depender de Infrastructure**
+- Infrastructure **NÃO depende de Data nem Domain**
+- Use `actor` apenas para componentes com:
+  - Estado mutável **ou**
+  - Concorrência real
+- **Não transforme tudo em `actor` por padrão**
+- Monitoramento de conectividade pertence à **Infrastructure**
+- Exposição de conectividade para o Domain deve ocorrer via:
+  - Repository **ou**
+  - UseCase
 
-----------------------------------------
-ESTRUTURA DE REFERÊNCIA
-----------------------------------------
+---
 
+## 📁 ESTRUTURA DE REFERÊNCIA
+
+```text
 GhibliApp
+│
 ├── App
 │   └── CompositionRoot
-│       └── AppDI.swift
+│       ├── AppDI.swift
+│       ├── AppEnvironment.swift
+│       └── AppConfiguration.swift
 │
 ├── Presentation
+│   │
+│   ├── Navigation
+│   │   ├── AppRoute.swift
+│   │   ├── AppRouter.swift
+│   │   └── RootView.swift
+│   │
 │   ├── Films
 │   │   ├── FilmsView.swift
 │   │   ├── FilmsViewModel.swift        // @MainActor
+│   │   ├── FilmsViewState.swift
 │   │   └── FilmUIModel.swift
 │   │
+│   ├── FilmDetail
+│   │   ├── FilmDetailView.swift
+│   │   ├── FilmDetailViewModel.swift   // @MainActor
+│   │   ├── FilmDetailViewState.swift
+│   │   │
+│   │   ├── Sections
+│   │   │   ├── PeopleSectionView.swift
+│   │   │   ├── LocationSectionView.swift
+│   │   │   ├── SpeciesSectionView.swift
+│   │   │   └── VehicleSectionView.swift
+│   │   │
+│   │   └── UIModels
+│   │       ├── PersonUIModel.swift
+│   │       ├── LocationUIModel.swift
+│   │       ├── SpeciesUIModel.swift
+│   │       └── VehicleUIModel.swift
+│   │
+│   ├── Favorites
+│   │   ├── FavoritesView.swift
+│   │   ├── FavoritesViewModel.swift    // @MainActor
+│   │   └── FavoritesViewState.swift
+│   │
+│   ├── Search
+│   │   ├── SearchView.swift
+│   │   ├── SearchViewModel.swift       // @MainActor
+│   │   └── SearchViewState.swift
+│   │
+│   ├── Settings
+│   │   ├── SettingsView.swift
+│   │   ├── SettingsViewModel.swift     // @MainActor
+│   │   └── SettingsViewState.swift
+│   │
 │   └── Components
-│       └── CarouselView.swift
+│       ├── CarouselView.swift
+│       ├── FilmRowView.swift
+│       ├── ConnectivityBanner.swift
+│       ├── EmptyStateView.swift
+│       ├── ErrorView.swift
+│       ├── LoadingView.swift
+│       ├── ShimmerView.swift
+│       └── LiquidGlassBackground.swift
 │
 ├── Domain
-│   ├── Entities
-│   │   └── Film.swift
+│   │
+│   ├── Models
+│   │   ├── Film.swift
+│   │   ├── Person.swift
+│   │   ├── Location.swift
+│   │   ├── Species.swift
+│   │   └── Vehicle.swift
 │   │
 │   ├── UseCases
-│   │   └── FetchFilmsUseCase.swift
+│   │   ├── FetchFilmsUseCase.swift
+│   │   ├── FetchFilmDetailUseCase.swift
+│   │   ├── FetchPeopleUseCase.swift
+│   │   ├── FetchLocationsUseCase.swift
+│   │   ├── FetchSpeciesUseCase.swift
+│   │   ├── FetchVehiclesUseCase.swift
+│   │   ├── GetFavoritesUseCase.swift
+│   │   ├── ToggleFavoriteUseCase.swift
+│   │   └── ObserveConnectivityUseCase.swift
 │   │
 │   ├── Repositories
-│   │   └── FilmRepository.swift        // protocol
+│   │   ├── FilmRepository.swift
+│   │   ├── PeopleRepository.swift
+│   │   ├── LocationRepository.swift
+│   │   ├── SpeciesRepository.swift
+│   │   ├── VehicleRepository.swift
+│   │   ├── FavoritesRepository.swift
+│   │   └── ConnectivityRepository.swift
 │   │
 │   └── Settings
-│       └── SettingsRepository.swift    // protocol (UserDefaults)
+│       └── SettingsRepository.swift
 │
 ├── Data
+│   │
 │   ├── Repositories
-│   │   ├── RemoteFilmRepository.swift      // actor
-│   │   ├── LocalFilmRepository.swift       // actor (SwiftData)
-│   │   ├── OfflineFirstFilmRepository.swift// actor
-│   │   └── MockFilmRepository.swift
+│   │   ├── RemoteFilmRepository.swift          // actor
+│   │   ├── LocalFilmRepository.swift           // actor (SwiftData)
+│   │   ├── OfflineFirstFilmRepository.swift    // actor
+│   │   │
+│   │   ├── RemotePeopleRepository.swift        // actor
+│   │   ├── RemoteLocationRepository.swift      // actor
+│   │   ├── RemoteSpeciesRepository.swift       // actor
+│   │   ├── RemoteVehicleRepository.swift       // actor
+│   │
+│   │   ├── FavoritesRepository.swift            // actor
+│   │   └── ConnectivityRepository.swift         // adapter
 │   │
 │   ├── DTOs
-│   │   └── FilmDTO.swift
+│   │   ├── FilmDTO.swift
+│   │   ├── PersonDTO.swift
+│   │   ├── LocationDTO.swift
+│   │   ├── SpeciesDTO.swift
+│   │   └── VehicleDTO.swift
 │   │
 │   └── Mappers
-│       └── FilmMapper.swift
+│       ├── FilmMapper.swift
+│       ├── PersonMapper.swift
+│       ├── LocationMapper.swift
+│       ├── SpeciesMapper.swift
+│       └── VehicleMapper.swift
 │
 ├── Infrastructure
+│   │
 │   ├── Network
-│   │   └── FilmRemoteService.swift     // actor
+│   │   ├── Endpoints
+│   │   │   ├── Endpoint.swift
+│   │   │   ├── FilmEndpoint.swift
+│   │   │   ├── PeopleEndpoint.swift
+│   │   │   ├── LocationEndpoint.swift
+│   │   │   ├── SpeciesEndpoint.swift
+│   │   │   └── VehicleEndpoint.swift
+│   │   │
+│   │   ├── HTTP
+│   │   │   ├── HTTPMethod.swift
+│   │   │   ├── HTTPClient.swift
+│   │   │   ├── HTTPError.swift
+│   │   │   └── HTTPRequestBuilder.swift
+│   │   │
+│   │   ├── Adapters
+│   │   │   ├── URLSessionAdapter.swift
+│   │   │   └── AlamofireAdapter.swift
+│   │   │
+│   │   └── Services
+│   │       ├── FilmRemoteService.swift      // actor
+│   │       ├── PeopleRemoteService.swift    // actor
+│   │       ├── LocationRemoteService.swift  // actor
+│   │       ├── SpeciesRemoteService.swift   // actor
+│   │       └── VehicleRemoteService.swift   // actor
 │   │
 │   ├── Persistence
-│   │   └── FilmLocalStore.swift        // actor (SwiftData)
+│   │   ├── FilmLocalStore.swift              // actor (SwiftData)
+│   │   ├── FavoritesStore.swift              // actor
+│   │   └── CacheStore.swift                  // actor
 │   │
-│   └── System
-│       └── UserDefaultsSettingsStore.swift // actor
+│   ├── System
+│   │   ├── ConnectivityMonitor.swift         // NWPathMonitor
+│   │   └── UserDefaultsSettingsStore.swift   // actor
+│   │
+│   └── Logging
+│       └── Logger.swift
+│
+├── Resources
+│   └── Assets.xcassets
+│
+├── Utils
+│   ├── Constants.swift
+│   └── Extensions
+│       ├── View+Extensions.swift
+│       └── Color+Extensions.swift
 │
 └── Tests
+    ├── DomainTests
+    ├── DataTests
+    └── PresentationTests
+
+```
 
 ----------------------------------------
-REGRAS DE NOMENCLATURA
+NOMENCLATURA E SEMÂNTICA DE COMPONENTES VISUAIS (OBRIGATÓRIO)
 ----------------------------------------
 
-1. Protocolos (interfaces):
-   - Nome abstrato
-   - Sem "Protocol", "Interface" ou "I"
+Durante a análise e refatoração, avalie criticamente nomes de componentes visuais (SwiftUI Views), garantindo que:
 
-   Ex:
-   - FilmRepository
-   - SettingsRepository
+PRINCÍPIOS
 
-2. Implementações concretas:
-   - Nome descreve o COMPORTAMENTO
-   - Nunca usar "Impl"
+Componentes devem ser nomeados pela INTENÇÃO / PAPEL NA UI, nunca apenas pelo efeito visual.
 
-   Ex:
-   - RemoteFilmRepository
-   - LocalFilmRepository
-   - OfflineFirstFilmRepository
-   - MockFilmRepository
+Evite nomes acoplados a:
 
-3. Services / Stores:
-   - Podem mencionar tecnologia
+Efeitos gráficos específicos (ex: blur, shimmer, glass)
 
-   Ex:
-   - FilmRemoteService
-   - FilmLocalStore
-   - UserDefaultsSettingsStore
+Termos de outras plataformas (ex: Material Design / Android)
 
-----------------------------------------
-REGRAS DE CONCORRÊNCIA
-----------------------------------------
+Os nomes devem:
 
-- ViewModels → @MainActor
-- Repositories → actor
-- Services / Stores → actor
-- UseCases NÃO são actor
-- Domain NÃO importa SwiftUI nem Foundation pesada
+Escalar semanticamente
 
-----------------------------------------
-TAREFAS QUE VOCÊ DEVE EXECUTAR
-----------------------------------------
+Permitir troca de implementação sem renomeação
 
-1. Verificar se a estrutura atual respeita as camadas.
-2. Identificar violações de dependência (ex: ViewModel chamando API).
-3. Ajustar nomes que não seguem o padrão Swift idiomático.
-4. Refatorar Repositories para usar `actor` quando houver estado.
-5. Garantir que UserDefaults não seja usado como Repository de entidade.
-6. Sugerir melhorias se algo estiver correto mas mal posicionado.
-7. Mostrar exemplos de código SOMENTE quando necessário para explicar.
+Refletir linguagem iOS / Apple Human Interface Guidelines
 
-----------------------------------------
-FORMATO DA RESPOSTA
-----------------------------------------
+REGRAS DE NOMENCLATURA VISUAL
 
-- Lista de problemas encontrados (se houver)
-- Justificativa arquitetural de cada correção
-- Estrutura final sugerida
-- Trechos de código apenas quando indispensáveis
+Não usar termos Material Design
+
+❌ Snackbar
+
+❌ Toast (quando não for realmente transient overlay)
+
+❌ CardView genérico sem contexto
+
+Prefira
+
+Banner
+
+Surface
+
+Placeholder
+
+Overlay
+
+Section
+
+Evitar nomes baseados apenas em efeito
+
+❌ ShimmerView
+
+❌ BlurBackground
+
+❌ LiquidGlassBackground
+
+Prefira nomes baseados em papel
+
+LoadingPlaceholderView
+
+ContentPlaceholderView
+
+SurfaceBackground
+
+TranslucentSurface
+
+Views genéricas só são aceitáveis se forem realmente reutilizáveis
+
+ErrorView, LoadingView, EmptyStateView
+→ só manter se forem configuráveis e usadas globalmente
+
+Caso contrário, especializar por contexto:
+
+FilmsEmptyStateView
+
+FavoritesEmptyStateView
+
+ErrorStateView
+
+LoadingOverlayView
+
+ORGANIZAÇÃO RECOMENDADA DE COMPONENTES
+
+Sugira (quando fizer sentido) a separação semântica dentro de Presentation/Components:
+
+Components
+├── State
+│   ├── LoadingPlaceholderView.swift
+│   ├── ErrorStateView.swift
+│   └── EmptyStateView.swift
+│
+├── Layout
+│   ├── CarouselView.swift
+│   ├── FilmRowView.swift
+│   └── InfoRow.swift
+│
+└── Surfaces
+    ├── AppBackground.swift
+    └── TranslucentSurface.swift
+
+EXPECTATIVA DA ANÁLISE
+
+Identifique nomes visuais problemáticos
+
+Explique por que o nome atual é fraco ou acoplado
+
+Proponha nomes mais semânticos e alinhados ao ecossistema iOS
+
+Não renomear por estética — apenas quando houver ganho arquitetural ou semântico
