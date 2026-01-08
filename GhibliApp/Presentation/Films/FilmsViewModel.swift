@@ -7,36 +7,40 @@ private final class FilmsViewModelTasks {
 }
 
 @Observable
+@MainActor
 final class FilmsViewModel {
     var state = FilmsViewState()
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
-    private let favoritesController: FavoritesController
+    private let getFavoritesUseCase: GetFavoritesUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
     private let __tasks = FilmsViewModelTasks()
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,
-        favoritesController: FavoritesController,
+        getFavoritesUseCase: GetFavoritesUseCase,
+        toggleFavoriteUseCase: ToggleFavoriteUseCase,
         observeConnectivityUseCase: ObserveConnectivityUseCase
     ) {
         self.fetchFilmsUseCase = fetchFilmsUseCase
-        self.favoritesController = favoritesController
+        self.getFavoritesUseCase = getFavoritesUseCase
+        self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.observeConnectivityUseCase = observeConnectivityUseCase
         listenToConnectivity()
     }
 
-    deinit { }
+    deinit {}
 
-    @MainActor
     func load(forceRefresh: Bool = false) async {
         guard state.status != .loading else { return }
         state.status = .loading
 
         do {
-            async let favoritesTask: Void = favoritesController.load()
-            let films = try await fetchFilmsUseCase.execute(forceRefresh: forceRefresh)
-            await favoritesTask
+            async let favoritesTask = getFavoritesUseCase.execute()
+            async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: forceRefresh)
+            let (favorites, films) = try await (favoritesTask, filmsTask)
+            state.favoriteIDs = favorites
             state.films = films
             state.status = films.isEmpty ? .empty : .loaded
         } catch {
@@ -45,15 +49,17 @@ final class FilmsViewModel {
     }
 
     func isFavorite(_ film: Film) -> Bool {
-        favoritesController.isFavorite(film.id)
+        state.favoriteIDs.contains(film.id)
     }
 
-    @MainActor
     func toggleFavorite(_ film: Film) async {
-        await favoritesController.toggle(id: film.id)
+        do {
+            state.favoriteIDs = try await toggleFavoriteUseCase.execute(id: film.id)
+        } catch {
+            state.snackbar = .disconnected
+        }
     }
 
-    @MainActor
     func dismissSnackbar() {
         state.snackbar = nil
     }
@@ -69,14 +75,14 @@ final class FilmsViewModel {
         }
     }
 
-    @MainActor
-    private func presentSnackbar(for stateValue: ConnectivitySnackbar.State) {
+    private func presentSnackbar(for stateValue: ConnectivityBanner.State) {
         state.snackbar = stateValue
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(stateValue == .connected ? .success : .error)
 
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
+            try? await Task.sleep(
+                nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
             await MainActor.run {
                 if self?.state.snackbar == stateValue {
                     self?.state.snackbar = nil

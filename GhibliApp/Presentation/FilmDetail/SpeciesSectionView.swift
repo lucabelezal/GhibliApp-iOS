@@ -12,7 +12,7 @@ struct SpeciesSectionView: View {
         ) { species in
             SpeciesCard(species: species)
         } placeholderBuilder: {
-            SpeciesCardShimmer()
+            SpeciesCardPlaceholder()
         }
         .task {
             await viewModel.load()
@@ -20,25 +20,25 @@ struct SpeciesSectionView: View {
     }
 }
 
-private struct SpeciesCardShimmer: View {
+private struct SpeciesCardPlaceholder: View {
     private let infoColumns = Array(
         repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(height: 16)
                 .frame(maxWidth: 180)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-            TagGroupShimmer()
+            TagGroupPlaceholder()
 
             Divider()
                 .opacity(0.2)
 
             LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
                 ForEach(0..<2, id: \.self) { _ in
-                    SpeciesTraitShimmer()
+                    SpeciesTraitPlaceholder()
                 }
             }
         }
@@ -59,11 +59,11 @@ private struct SpeciesCardShimmer: View {
     }
 }
 
-private struct TagGroupShimmer: View {
+private struct TagGroupPlaceholder: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0..<3, id: \.self) { _ in
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(width: 60, height: 18)
                     .clipShape(Capsule())
             }
@@ -72,20 +72,20 @@ private struct TagGroupShimmer: View {
     }
 }
 
-private struct SpeciesTraitShimmer: View {
+private struct SpeciesTraitPlaceholder: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(width: 14, height: 14)
                     .clipShape(Circle())
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(height: 10)
                     .frame(maxWidth: 60)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
 
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(height: 12)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }

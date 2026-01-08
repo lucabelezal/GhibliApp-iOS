@@ -6,7 +6,7 @@ struct FavoritesView: View {
 
     var body: some View {
         ZStack {
-            LiquidGlassBackground()
+            AppBackground()
             content
         }
         .navigationTitle("Favoritos")
@@ -22,7 +22,8 @@ struct FavoritesView: View {
         case .idle, .loading:
             LoadingView()
         case .empty:
-            EmptyStateView(title: "Sem favoritos", subtitle: "Adicione filmes aos favoritos para vê-los aqui")
+            EmptyStateView(
+                title: "Sem favoritos", subtitle: "Adicione filmes aos favoritos para vê-los aqui")
         case .error(let message):
             ErrorView(message: message, retryTitle: "Recarregar") {
                 Task { await viewModel.load() }

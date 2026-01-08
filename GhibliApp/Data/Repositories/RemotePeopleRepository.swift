@@ -1,6 +1,6 @@
 import Foundation
 
-struct PeopleRepositoryImpl: PeopleRepository {
+struct RemotePeopleRepository: PeopleRepositoryProtocol {
     private let client: any HTTPClient & Sendable
     private let cache: SwiftDataCacheStore
     private let baseURL: URL

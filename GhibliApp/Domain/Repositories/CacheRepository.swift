@@ -1,5 +1,5 @@
 import Foundation
 
-public protocol CacheRepository: Sendable {
+public protocol CacheRepositoryProtocol: Sendable {
     func clearCache() async throws
 }

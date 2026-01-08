@@ -1,6 +1,6 @@
 import Foundation
 
-struct SpeciesRepositoryImpl: SpeciesRepository {
+struct RemoteSpeciesRepository: SpeciesRepositoryProtocol {
     private let client: any HTTPClient & Sendable
     private let cache: SwiftDataCacheStore
 

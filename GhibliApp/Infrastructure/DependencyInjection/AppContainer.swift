@@ -5,7 +5,6 @@ final class AppContainer {
     static let shared = AppContainer()
 
     let router: AppRouter
-    let favoritesController: FavoritesController
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let fetchPeopleUseCase: FetchPeopleUseCase
     private let fetchLocationsUseCase: FetchLocationsUseCase
@@ -13,37 +12,37 @@ final class AppContainer {
     private let fetchVehiclesUseCase: FetchVehiclesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
+    private let clearFavoritesUseCase: ClearFavoritesUseCase
     private let clearCacheUseCase: ClearCacheUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
     private init() {
         let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
         #if DEBUG
-        let httpLogger: HTTPLogger? = DefaultHTTPLogger()
+            let httpLogger: HTTPLogger? = DefaultHTTPLogger()
         #else
-        let httpLogger: HTTPLogger? = nil
+            let httpLogger: HTTPLogger? = nil
         #endif
 
         let httpClient = URLSessionAdapter(baseURL: apiBaseURL, logger: httpLogger)
         let cacheStore = SwiftDataCacheStore.shared
-        let filmRepository: FilmRepository = FilmRepositoryImpl(
+        let filmRepository: FilmRepositoryProtocol = RemoteFilmRepository(
             client: httpClient, cache: cacheStore)
-        let peopleRepository: PeopleRepository = PeopleRepositoryImpl(
+        let peopleRepository: PeopleRepositoryProtocol = RemotePeopleRepository(
             client: httpClient,
             baseURL: apiBaseURL,
             cache: cacheStore)
-        let locationsRepository: LocationsRepository = LocationsRepositoryImpl(
+        let locationsRepository: LocationsRepositoryProtocol = RemoteLocationsRepository(
             client: httpClient, cache: cacheStore)
-        let speciesRepository: SpeciesRepository = SpeciesRepositoryImpl(
+        let speciesRepository: SpeciesRepositoryProtocol = RemoteSpeciesRepository(
             client: httpClient, cache: cacheStore)
-        let vehiclesRepository: VehiclesRepository = VehiclesRepositoryImpl(
+        let vehiclesRepository: VehiclesRepositoryProtocol = RemoteVehiclesRepository(
             client: httpClient, cache: cacheStore)
-        let favoritesStore: FavoritesStoreAdapter = SwiftDataFavoritesStore()
-        let favoritesService = FavoritesService(store: favoritesStore)
-        let favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(
+        let favoritesStore: FavoritesStoreProtocol = SwiftDataFavoritesStore()
+        let favoritesRepository: FavoritesRepositoryProtocol = FavoritesRepositoryStore(
             store: favoritesStore)
-        let cacheRepository: CacheRepository = CacheRepositoryImpl(cache: cacheStore)
-        let connectivityRepository: ConnectivityRepository = ConnectivityMonitor()
+        let cacheRepository: CacheRepositoryProtocol = CacheRepositoryStore(cache: cacheStore)
+        let connectivityRepository: ConnectivityRepositoryProtocol = ConnectivityMonitor()
 
         self.fetchFilmsUseCase = FetchFilmsUseCase(repository: filmRepository)
         self.fetchPeopleUseCase = FetchPeopleUseCase(repository: peopleRepository)
@@ -52,18 +51,19 @@ final class AppContainer {
         self.fetchVehiclesUseCase = FetchVehiclesUseCase(repository: vehiclesRepository)
         self.toggleFavoriteUseCase = ToggleFavoriteUseCase(repository: favoritesRepository)
         self.getFavoritesUseCase = GetFavoritesUseCase(repository: favoritesRepository)
+        self.clearFavoritesUseCase = ClearFavoritesUseCase(repository: favoritesRepository)
         self.clearCacheUseCase = ClearCacheUseCase(repository: cacheRepository)
         self.observeConnectivityUseCase = ObserveConnectivityUseCase(
             repository: connectivityRepository)
 
-        self.favoritesController = FavoritesController(service: favoritesService)
         self.router = AppRouter()
     }
 
     func makeFilmsViewModel() -> FilmsViewModel {
         FilmsViewModel(
             fetchFilmsUseCase: fetchFilmsUseCase,
-            favoritesController: favoritesController,
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase,
             observeConnectivityUseCase: observeConnectivityUseCase
         )
     }
@@ -75,21 +75,24 @@ final class AppContainer {
             fetchLocationsUseCase: fetchLocationsUseCase,
             fetchSpeciesUseCase: fetchSpeciesUseCase,
             fetchVehiclesUseCase: fetchVehiclesUseCase,
-            favoritesController: favoritesController
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase
         )
     }
 
     func makeFavoritesViewModel() -> FavoritesViewModel {
         FavoritesViewModel(
             fetchFilmsUseCase: fetchFilmsUseCase,
-            favoritesController: favoritesController
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase
         )
     }
 
     func makeSearchViewModel() -> SearchViewModel {
         SearchViewModel(
             fetchFilmsUseCase: fetchFilmsUseCase,
-            favoritesController: favoritesController,
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase,
             observeConnectivityUseCase: observeConnectivityUseCase
         )
     }
@@ -97,7 +100,7 @@ final class AppContainer {
     func makeSettingsViewModel() -> SettingsViewModel {
         SettingsViewModel(
             clearCacheUseCase: clearCacheUseCase,
-            favoritesController: favoritesController
+            clearFavoritesUseCase: clearFavoritesUseCase
         )
     }
 }

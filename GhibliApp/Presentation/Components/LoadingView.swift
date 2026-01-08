@@ -6,7 +6,7 @@ struct LoadingView: View {
     var body: some View {
         VStack(spacing: 16) {
             ForEach(0..<count, id: \.self) { _ in
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(height: 80)
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .overlay(

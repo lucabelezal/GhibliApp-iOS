@@ -1,17 +1,17 @@
 import Foundation
 
-actor FavoritesService {
+struct FavoritesRepositoryStore: FavoritesRepositoryProtocol {
     private let store: FavoritesStoreProtocol
 
     init(store: FavoritesStoreProtocol) {
         self.store = store
     }
 
-    func load() async throws -> Set<String> {
+    func loadFavorites() async throws -> Set<String> {
         try await store.load()
     }
 
-    func toggle(id: String) async throws -> Set<String> {
+    func toggleFavorite(id: String) async throws -> Set<String> {
         var ids = try await store.load()
         if ids.contains(id) {
             ids.remove(id)
@@ -22,7 +22,12 @@ actor FavoritesService {
         return ids
     }
 
-    func clear() async throws {
+    func isFavorite(id: String) async throws -> Bool {
+        let ids = try await store.load()
+        return ids.contains(id)
+    }
+
+    func clearFavorites() async throws {
         try await store.clear()
     }
 }

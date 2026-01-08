@@ -17,7 +17,7 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            LiquidGlassBackground()
+            AppBackground()
             form
             if viewModel.state.showResetConfirmation {
                 resetDialog
@@ -54,7 +54,8 @@ struct SettingsView: View {
             }
 
             Section("Preferences") {
-                Stepper("Items per page: \(itemsPerPage)", value: $itemsPerPage, in: 10...100, step: 5)
+                Stepper(
+                    "Items per page: \(itemsPerPage)", value: $itemsPerPage, in: 10...100, step: 5)
                 Toggle("Enable notifications", isOn: $notificationsEnabled)
             }
 
@@ -145,7 +146,8 @@ extension View {
 }
 
 struct AppearanceThemeViewModifier: ViewModifier {
-    @AppStorage(UserDefaultsKeys.appearanceTheme) private var appearanceTheme: AppearanceTheme = .system
+    @AppStorage(UserDefaultsKeys.appearanceTheme) private var appearanceTheme: AppearanceTheme =
+        .system
 
     func body(content: Content) -> some View {
         content
@@ -154,9 +156,9 @@ struct AppearanceThemeViewModifier: ViewModifier {
 
     func scheme() -> ColorScheme? {
         switch appearanceTheme {
-            case .dark: return .dark
-            case .light: return .light
-            case .system: return nil
+        case .dark: return .dark
+        case .light: return .light
+        case .system: return nil
         }
     }
 }

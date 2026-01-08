@@ -1,13 +1,13 @@
 import Foundation
 
-public struct ToggleFavoriteUseCase: Sendable {
+public struct ClearFavoritesUseCase: Sendable {
     private let repository: FavoritesRepositoryProtocol
 
     public init(repository: FavoritesRepositoryProtocol) {
         self.repository = repository
     }
 
-    public func execute(id: String) async throws -> Set<String> {
-        try await repository.toggleFavorite(id: id)
+    public func execute() async throws {
+        try await repository.clearFavorites()
     }
 }

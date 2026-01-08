@@ -1,5 +1,5 @@
 import Foundation
 
-public protocol ConnectivityRepository: Sendable {
+public protocol ConnectivityRepositoryProtocol: Sendable {
     var connectivityStream: AsyncStream<Bool> { get }
 }

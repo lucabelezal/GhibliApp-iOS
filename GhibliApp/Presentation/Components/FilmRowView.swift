@@ -16,7 +16,7 @@ struct FilmRowView: View {
                 case .failure:
                     placeholder
                 case .empty:
-                    ShimmerView()
+                    LoadingPlaceholderView()
                 @unknown default:
                     placeholder
                 }
@@ -99,7 +99,7 @@ struct FilmRowView: View {
 
 }
 
-struct FilmRowShimmerView: View {
+struct FilmRowPlaceholderView: View {
     private enum PlaceholderWidth: CGFloat {
         case full = 1.0
         case regular = 0.8
@@ -131,23 +131,23 @@ struct FilmRowShimmerView: View {
     }
 
     private var posterPlaceholder: some View {
-        ShimmerView()
+        LoadingPlaceholderView()
             .frame(width: posterSize.width, height: posterSize.height)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var titlePlaceholder: some View {
         VStack(alignment: .leading, spacing: 6) {
-            shimmerLine(.full, height: 16)
-            shimmerLine(.regular)
+            placeholderLine(.full, height: 16)
+            placeholderLine(.regular)
         }
     }
 
     private var synopsisPlaceholder: some View {
         VStack(alignment: .leading, spacing: 6) {
-            shimmerLine(.full)
-            shimmerLine(.regular)
-            shimmerLine(.short)
+            placeholderLine(.full)
+            placeholderLine(.regular)
+            placeholderLine(.short)
         }
     }
 
@@ -162,7 +162,7 @@ struct FilmRowShimmerView: View {
     private var accessoryPlaceholder: some View {
         VStack(spacing: 0) {
             Spacer()
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(width: 10, height: 30)
                 .clipShape(Capsule())
                 .frame(width: accessoryWidth, alignment: .center)
@@ -172,17 +172,19 @@ struct FilmRowShimmerView: View {
     }
 
     private var favoritePlaceholder: some View {
-        ShimmerView()
+        LoadingPlaceholderView()
             .frame(width: 20, height: 20)
             .clipShape(Circle())
             .frame(width: 44, height: 44)
             .padding(.trailing, 8)
     }
 
-    private func shimmerLine(_ width: PlaceholderWidth = .full, height: CGFloat = 12) -> some View {
+    private func placeholderLine(_ width: PlaceholderWidth = .full, height: CGFloat = 12)
+        -> some View
+    {
         GeometryReader { proxy in
             let availableWidth = max(proxy.size.width, 1)
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(width: availableWidth * width.rawValue, height: height, alignment: .leading)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }
@@ -193,7 +195,7 @@ struct FilmRowShimmerView: View {
     private func infoChip(_ width: PlaceholderWidth = .regular) -> some View {
         GeometryReader { proxy in
             let availableWidth = max(proxy.size.width, 1)
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(width: availableWidth * width.rawValue, height: 16, alignment: .leading)
                 .clipShape(Capsule())
         }

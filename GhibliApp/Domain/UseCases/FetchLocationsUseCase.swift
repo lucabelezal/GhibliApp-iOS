@@ -1,9 +1,9 @@
 import Foundation
 
 public struct FetchLocationsUseCase: Sendable {
-    private let repository: LocationsRepository
+    private let repository: LocationsRepositoryProtocol
 
-    public init(repository: LocationsRepository) {
+    public init(repository: LocationsRepositoryProtocol) {
         self.repository = repository
     }
 

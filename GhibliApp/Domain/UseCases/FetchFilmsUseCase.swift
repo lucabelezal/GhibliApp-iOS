@@ -1,9 +1,9 @@
 import Foundation
 
 public struct FetchFilmsUseCase: Sendable {
-    private let repository: FilmRepository
+    private let repository: FilmRepositoryProtocol
 
-    public init(repository: FilmRepository) {
+    public init(repository: FilmRepositoryProtocol) {
         self.repository = repository
     }
 

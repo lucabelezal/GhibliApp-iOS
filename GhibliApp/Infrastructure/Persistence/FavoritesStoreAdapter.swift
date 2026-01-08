@@ -1,12 +1,12 @@
 import Foundation
 
-protocol FavoritesStoreAdapter: Sendable {
+protocol FavoritesStoreProtocol: Sendable {
     func load() async throws -> Set<String>
     func save(ids: Set<String>) async throws
     func clear() async throws
 }
 
-struct UserDefaultsFavoritesStore: FavoritesStoreAdapter {
+struct UserDefaultsFavoritesStore: FavoritesStoreProtocol {
     private let key = "GhibliApp.Favorites"
     private let defaults: UserDefaults
 
@@ -28,7 +28,7 @@ struct UserDefaultsFavoritesStore: FavoritesStoreAdapter {
     }
 }
 
-struct SwiftDataFavoritesStore: FavoritesStoreAdapter {
+struct SwiftDataFavoritesStore: FavoritesStoreProtocol {
     private let cache = SwiftDataCacheStore.shared
     private let cacheKey = "favorites"
 

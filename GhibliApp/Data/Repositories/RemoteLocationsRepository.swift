@@ -1,6 +1,6 @@
 import Foundation
 
-struct LocationsRepositoryImpl: LocationsRepository {
+struct RemoteLocationsRepository: LocationsRepositoryProtocol {
     private let client: any HTTPClient & Sendable
     private let cache: SwiftDataCacheStore
 

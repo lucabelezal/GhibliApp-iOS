@@ -1,9 +1,9 @@
 import Foundation
 
-struct FavoritesRepositoryImpl: FavoritesRepository {
-    private let store: FavoritesStoreAdapter
+struct FavoritesRepositoryImpl: FavoritesRepositoryProtocol {
+    private let store: FavoritesStoreProtocol
 
-    init(store: FavoritesStoreAdapter) {
+    init(store: FavoritesStoreProtocol) {
         self.store = store
     }
 
@@ -25,5 +25,9 @@ struct FavoritesRepositoryImpl: FavoritesRepository {
     func isFavorite(id: String) async throws -> Bool {
         let ids = try await store.load()
         return ids.contains(id)
+    }
+
+    func clearFavorites() async throws {
+        try await store.clear()
     }
 }

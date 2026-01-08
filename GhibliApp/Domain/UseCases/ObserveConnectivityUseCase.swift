@@ -1,9 +1,9 @@
 import Foundation
 
 public struct ObserveConnectivityUseCase: Sendable {
-    private let repository: ConnectivityRepository
+    private let repository: ConnectivityRepositoryProtocol
 
-    public init(repository: ConnectivityRepository) {
+    public init(repository: ConnectivityRepositoryProtocol) {
         self.repository = repository
     }
 

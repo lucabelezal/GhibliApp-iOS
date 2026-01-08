@@ -4,11 +4,11 @@ struct FilmsView: View {
     @State private var isRefreshing = false
     @Bindable var viewModel: FilmsViewModel
     let openDetail: (Film) -> Void
-    private let shimmerPlaceholderCount = 6
+    private let placeholderCount = 6
 
     var body: some View {
         ZStack(alignment: .top) {
-            LiquidGlassBackground()
+            AppBackground()
             content
             snackbar
         }
@@ -38,9 +38,9 @@ struct FilmsView: View {
 
             switch viewModel.state.status {
             case .idle, .loading:
-                ForEach(0..<shimmerPlaceholderCount, id: \.self) { index in
-                    FilmRowShimmerRow(
-                        isFirst: index == 0, isLast: index == shimmerPlaceholderCount - 1
+                ForEach(0..<placeholderCount, id: \.self) { index in
+                    FilmRowPlaceholderRow(
+                        isFirst: index == 0, isLast: index == placeholderCount - 1
                     )
                 }
 
@@ -96,7 +96,7 @@ struct FilmsView: View {
     private var snackbar: some View {
         if let snackbarState = viewModel.state.snackbar {
             VStack {
-                ConnectivitySnackbar(state: snackbarState) {
+                ConnectivityBanner(state: snackbarState) {
                     viewModel.dismissSnackbar()
                 }
                 .padding()
@@ -108,13 +108,13 @@ struct FilmsView: View {
     }
 }
 
-private struct FilmRowShimmerRow: View {
+private struct FilmRowPlaceholderRow: View {
     let isFirst: Bool
     let isLast: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            FilmRowShimmerView()
+            FilmRowPlaceholderView()
                 .padding(.vertical, 16)
                 .padding(.horizontal, 16)
 

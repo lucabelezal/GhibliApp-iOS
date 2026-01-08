@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-final class ConnectivityMonitor: ConnectivityRepository {
+final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "dev.ghibliapp.connectivity")
     private let continuationLock = NSLock()

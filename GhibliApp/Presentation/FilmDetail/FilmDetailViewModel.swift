@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 final class FilmDetailViewModel {
     let film: Film
     var state = FilmDetailViewState()
@@ -10,7 +11,8 @@ final class FilmDetailViewModel {
     let locationsSectionViewModel: FilmDetailSectionViewModel<Location>
     let speciesSectionViewModel: FilmDetailSectionViewModel<Species>
     let vehiclesSectionViewModel: FilmDetailSectionViewModel<Vehicle>
-    private let favoritesController: FavoritesController
+    private let getFavoritesUseCase: GetFavoritesUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
 
     init(
         film: Film,
@@ -18,10 +20,12 @@ final class FilmDetailViewModel {
         fetchLocationsUseCase: FetchLocationsUseCase,
         fetchSpeciesUseCase: FetchSpeciesUseCase,
         fetchVehiclesUseCase: FetchVehiclesUseCase,
-        favoritesController: FavoritesController
+        getFavoritesUseCase: GetFavoritesUseCase,
+        toggleFavoriteUseCase: ToggleFavoriteUseCase
     ) {
         self.film = film
-        self.favoritesController = favoritesController
+        self.getFavoritesUseCase = getFavoritesUseCase
+        self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.charactersSectionViewModel = .characters(
             film: film,
             fetchPeopleUseCase: fetchPeopleUseCase
@@ -38,10 +42,9 @@ final class FilmDetailViewModel {
             film: film,
             fetchVehiclesUseCase: fetchVehiclesUseCase
         )
-        state.isFavorite = favoritesController.isFavorite(film.id)
+        Task { await loadFavoriteState() }
     }
 
-    @MainActor
     func refreshAllSections(forceRefresh: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.charactersSectionViewModel.load(forceRefresh: forceRefresh) }
@@ -51,10 +54,15 @@ final class FilmDetailViewModel {
         }
     }
 
-    @MainActor
     func toggleFavorite() async {
-        await favoritesController.toggle(id: film.id)
-        state.isFavorite = favoritesController.isFavorite(film.id)
+        do {
+            let favorites = try await toggleFavoriteUseCase.execute(id: film.id)
+            state.isFavorite = favorites.contains(film.id)
+        } catch {}
     }
 
+    private func loadFavoriteState() async {
+        guard let favorites = try? await getFavoritesUseCase.execute() else { return }
+        state.isFavorite = favorites.contains(film.id)
+    }
 }

@@ -6,14 +6,15 @@ struct SearchView: View {
 
     var body: some View {
         ZStack {
-            LiquidGlassBackground()
+            AppBackground()
             content
         }
         .navigationTitle("Buscar")
-        .searchable(text: Binding(
-            get: { viewModel.state.query },
-            set: { viewModel.updateQuery($0) }
-        ), prompt: "Busque filmes")
+        .searchable(
+            text: Binding(
+                get: { viewModel.state.query },
+                set: { viewModel.updateQuery($0) }
+            ), prompt: "Busque filmes")
     }
 
     @ViewBuilder
@@ -23,7 +24,8 @@ struct SearchView: View {
         } else {
             switch viewModel.state.status {
             case .idle:
-                EmptyStateView(title: "Busque filmes", subtitle: "Digite o nome do filme para começar")
+                EmptyStateView(
+                    title: "Busque filmes", subtitle: "Digite o nome do filme para começar")
             case .loading:
                 LoadingView()
             case .empty:
@@ -43,7 +45,9 @@ struct SearchView: View {
                                     FilmRowView(
                                         film: film,
                                         isFavorite: viewModel.isFavorite(film),
-                                        onToggleFavorite: { Task { await viewModel.toggleFavorite(film) } }
+                                        onToggleFavorite: {
+                                            Task { await viewModel.toggleFavorite(film) }
+                                        }
                                     )
                                     .padding(.vertical, 12)
                                 }

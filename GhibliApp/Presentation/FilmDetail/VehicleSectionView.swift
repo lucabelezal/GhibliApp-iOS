@@ -12,7 +12,7 @@ struct VehicleSectionView: View {
         ) { vehicle in
             VehicleCard(vehicle: vehicle)
         } placeholderBuilder: {
-            VehicleCardShimmer()
+            VehicleCardPlaceholder()
         }
         .task {
             await viewModel.load()
@@ -77,20 +77,20 @@ private struct VehicleCard: View {
     }
 }
 
-private struct VehicleCardShimmer: View {
+private struct VehicleCardPlaceholder: View {
     private let infoColumns = Array(
         repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(height: 16)
                 .frame(maxWidth: 180)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(0..<3, id: \.self) { _ in
-                    ShimmerView()
+                    LoadingPlaceholderView()
                         .frame(height: 10)
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
@@ -102,7 +102,7 @@ private struct VehicleCardShimmer: View {
 
             LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
                 ForEach(0..<2, id: \.self) { _ in
-                    VehicleTraitShimmer()
+                    VehicleTraitPlaceholder()
                 }
             }
         }
@@ -123,20 +123,20 @@ private struct VehicleCardShimmer: View {
     }
 }
 
-private struct VehicleTraitShimmer: View {
+private struct VehicleTraitPlaceholder: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(width: 14, height: 14)
                     .clipShape(Circle())
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(height: 10)
                     .frame(maxWidth: 70)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
 
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(height: 12)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }

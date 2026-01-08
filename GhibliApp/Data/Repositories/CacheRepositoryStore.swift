@@ -1,6 +1,6 @@
 import Foundation
 
-struct CacheRepositoryImpl: CacheRepository {
+struct CacheRepositoryStore: CacheRepositoryProtocol {
     private let cache: SwiftDataCacheStore
 
     init(cache: SwiftDataCacheStore = .shared) {

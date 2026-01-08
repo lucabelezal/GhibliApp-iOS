@@ -12,22 +12,25 @@ final class SearchViewModel {
     var state = SearchViewState()
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
-    private let favoritesController: FavoritesController
+    private let getFavoritesUseCase: GetFavoritesUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
     private let __tasks = SearchViewModelTasks()
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,
-        favoritesController: FavoritesController,
+        getFavoritesUseCase: GetFavoritesUseCase,
+        toggleFavoriteUseCase: ToggleFavoriteUseCase,
         observeConnectivityUseCase: ObserveConnectivityUseCase
     ) {
         self.fetchFilmsUseCase = fetchFilmsUseCase
-        self.favoritesController = favoritesController
+        self.getFavoritesUseCase = getFavoritesUseCase
+        self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.observeConnectivityUseCase = observeConnectivityUseCase
         listenConnectivity()
     }
 
-    deinit { }
+    deinit {}
 
     func updateQuery(_ query: String) {
         state.query = query
@@ -55,7 +58,10 @@ final class SearchViewModel {
         }
 
         do {
-            let films = try await fetchFilmsUseCase.execute(forceRefresh: true)
+            async let favoritesTask = getFavoritesUseCase.execute()
+            async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: true)
+            let (favorites, films) = try await (favoritesTask, filmsTask)
+            state.favoriteIDs = favorites
             let filtered = films.filter { $0.title.localizedCaseInsensitiveContains(query) }
             await MainActor.run {
                 state.results = filtered
@@ -69,12 +75,16 @@ final class SearchViewModel {
     }
 
     func isFavorite(_ film: Film) -> Bool {
-        favoritesController.isFavorite(film.id)
+        state.favoriteIDs.contains(film.id)
     }
 
     @MainActor
     func toggleFavorite(_ film: Film) async {
-        await favoritesController.toggle(id: film.id)
+        do {
+            state.favoriteIDs = try await toggleFavoriteUseCase.execute(id: film.id)
+        } catch {
+            state.status = .error(error.localizedDescription)
+        }
     }
 
     private func listenConnectivity() {

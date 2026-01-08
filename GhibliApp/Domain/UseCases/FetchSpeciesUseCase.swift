@@ -1,9 +1,9 @@
 import Foundation
 
 public struct FetchSpeciesUseCase: Sendable {
-    private let repository: SpeciesRepository
+    private let repository: SpeciesRepositoryProtocol
 
-    public init(repository: SpeciesRepository) {
+    public init(repository: SpeciesRepositoryProtocol) {
         self.repository = repository
     }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-struct FilmRepositoryImpl: FilmRepository {
+struct RemoteFilmRepository: FilmRepositoryProtocol {
     private let client: any HTTPClient & Sendable
     private let cache: SwiftDataCacheStore
     private let cacheKey = "films.catalog"

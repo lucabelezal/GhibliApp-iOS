@@ -2,18 +2,19 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 final class SettingsViewModel {
     var state = SettingsViewState()
 
     private let clearCacheUseCase: ClearCacheUseCase
-    private let favoritesController: FavoritesController
+    private let clearFavoritesUseCase: ClearFavoritesUseCase
 
     init(
         clearCacheUseCase: ClearCacheUseCase,
-        favoritesController: FavoritesController
+        clearFavoritesUseCase: ClearFavoritesUseCase
     ) {
         self.clearCacheUseCase = clearCacheUseCase
-        self.favoritesController = favoritesController
+        self.clearFavoritesUseCase = clearFavoritesUseCase
     }
 
     func presentReset() {
@@ -24,11 +25,10 @@ final class SettingsViewModel {
         state.showResetConfirmation = false
     }
 
-    @MainActor
     func resetCache() async {
         do {
             try await clearCacheUseCase.execute()
-            await favoritesController.clear()
+            try await clearFavoritesUseCase.execute()
             state.cacheMessage = "Cache removido com sucesso"
         } catch {
             state.cacheMessage = "Falha ao limpar cache"

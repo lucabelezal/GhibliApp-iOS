@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ConnectivitySnackbar: View {
+struct ConnectivityBanner: View {
     enum State: Equatable {
         case connected
         case disconnected
@@ -21,7 +21,9 @@ struct ConnectivitySnackbar: View {
         }
         .padding()
         .foregroundStyle(.white)
-        .background(state == .connected ? Color.green.opacity(0.9) : Color.red.opacity(0.9), in: Capsule())
+        .background(
+            state == .connected ? Color.green.opacity(0.9) : Color.red.opacity(0.9), in: Capsule()
+        )
         .shadow(radius: 10)
         .transition(.move(edge: .top).combined(with: .opacity))
     }

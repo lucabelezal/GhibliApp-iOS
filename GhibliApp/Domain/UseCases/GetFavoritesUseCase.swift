@@ -1,9 +1,9 @@
 import Foundation
 
 public struct GetFavoritesUseCase: Sendable {
-    private let repository: FavoritesRepository
+    private let repository: FavoritesRepositoryProtocol
 
-    public init(repository: FavoritesRepository) {
+    public init(repository: FavoritesRepositoryProtocol) {
         self.repository = repository
     }
 

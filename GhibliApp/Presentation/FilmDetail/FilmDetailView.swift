@@ -5,7 +5,7 @@ struct FilmDetailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            LiquidGlassBackground()
+            AppBackground()
 
             ScrollView {
                 VStack(spacing: 24) {

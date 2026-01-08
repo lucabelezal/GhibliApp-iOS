@@ -12,7 +12,7 @@ struct LocationSectionView: View {
         ) { location in
             LocationCard(location: location)
         } placeholderBuilder: {
-            LocationCardShimmer()
+            LocationCardPlaceholder()
         }
         .task {
             await viewModel.load()
@@ -108,32 +108,32 @@ private struct LocationCard: View {
     }
 }
 
-private struct LocationCardShimmer: View {
+private struct LocationCardPlaceholder: View {
     private let infoColumns = Array(
         repeating: GridItem(.flexible(), spacing: 10, alignment: .topLeading), count: 2)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(height: 16)
                     .frame(maxWidth: 160)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(height: 14)
                     .frame(maxWidth: 120)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
 
-            TagGroupShimmer()
+            TagGroupPlaceholder()
 
             Divider()
                 .opacity(0.2)
 
             LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 10) {
                 ForEach(0..<3, id: \.self) { _ in
-                    LocationTraitShimmer()
+                    LocationTraitPlaceholder()
                 }
             }
         }
@@ -154,11 +154,11 @@ private struct LocationCardShimmer: View {
     }
 }
 
-private struct TagGroupShimmer: View {
+private struct TagGroupPlaceholder: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0..<3, id: \.self) { _ in
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(width: 70, height: 18)
                     .clipShape(Capsule())
             }
@@ -167,20 +167,20 @@ private struct TagGroupShimmer: View {
     }
 }
 
-private struct LocationTraitShimmer: View {
+private struct LocationTraitPlaceholder: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(width: 14, height: 14)
                     .clipShape(Circle())
-                ShimmerView()
+                LoadingPlaceholderView()
                     .frame(height: 10)
                     .frame(maxWidth: 50)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
 
-            ShimmerView()
+            LoadingPlaceholderView()
                 .frame(height: 12)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }

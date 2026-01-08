@@ -1,9 +1,9 @@
 import Foundation
 
 public struct FetchPeopleUseCase: Sendable {
-    private let repository: PeopleRepository
+    private let repository: PeopleRepositoryProtocol
 
-    public init(repository: PeopleRepository) {
+    public init(repository: PeopleRepositoryProtocol) {
         self.repository = repository
     }
 
