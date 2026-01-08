@@ -57,3 +57,10 @@ public final class AlamofireAdapter: HTTPClient {
 
 	// logging handled via injected `HTTPLogger` (DEBUG only)
 }
+
+// NOTE: Alamofire's `Session` is a reference type from an external library
+// that we did not fully audit for `Sendable` semantics here. To allow
+// using `AlamofireAdapter` in detached tasks without a larger adapter
+// refactor, mark it as `@unchecked Sendable`. Prefer a deeper refactor
+// (wrapping or ensuring session immutability) in follow-up work.
+extension AlamofireAdapter: @unchecked Sendable {}

@@ -5,15 +5,15 @@ public final class URLSessionAdapter: HTTPClient {
     private let baseURL: URL
     private let baseQueryItems: [URLQueryItem]
     private let timeoutInterval: TimeInterval
-    private let requestFactory: EndpointRequestFactory
+    private let requestFactory: EndpointRequestFactory & Sendable
     private let logger: HTTPLogger?
-    
+
     public init(
         baseURL: URL,
         baseURLQueryItems: [URLQueryItem]? = nil,
         session: URLSession = .shared,
         timeoutInterval: TimeInterval = 30,
-        requestFactory: EndpointRequestFactory = DefaultEndpointRequestFactory(),
+        requestFactory: EndpointRequestFactory & Sendable = DefaultEndpointRequestFactory(),
         logger: HTTPLogger? = nil,
     ) {
         self.session = session
@@ -23,7 +23,7 @@ public final class URLSessionAdapter: HTTPClient {
         self.requestFactory = requestFactory
         self.logger = logger
     }
-    
+
     public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
         let request = try requestFactory.makeRequest(
             for: endpoint,
@@ -31,11 +31,11 @@ public final class URLSessionAdapter: HTTPClient {
             baseQueryItems: baseQueryItems,
             timeoutInterval: timeoutInterval
         )
-        
-#if DEBUG
-        logger?.logRequest(request, endpoint: endpoint)
-#endif
-        
+
+        #if DEBUG
+            logger?.logRequest(request, endpoint: endpoint)
+        #endif
+
         do {
             let (data, response) = try await session.data(for: request)
             let result: Result<T> = handleResponse(
@@ -43,10 +43,10 @@ public final class URLSessionAdapter: HTTPClient {
                 nil,
                 data: data
             )
-            
-#if DEBUG
-            logger?.logResponse(response as? HTTPURLResponse, data: data, endpoint: endpoint)
-#endif
+
+            #if DEBUG
+                logger?.logResponse(response as? HTTPURLResponse, data: data, endpoint: endpoint)
+            #endif
             switch result {
             case .success(let value):
                 return value
@@ -61,5 +61,8 @@ public final class URLSessionAdapter: HTTPClient {
             throw HTTPError.unknown(error.localizedDescription)
         }
     }
-    
+
 }
+
+// MARK: - Sendable
+extension URLSessionAdapter: Sendable {}

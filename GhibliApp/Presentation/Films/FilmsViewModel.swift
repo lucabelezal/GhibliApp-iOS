@@ -34,17 +34,25 @@ final class FilmsViewModel {
 
     func load(forceRefresh: Bool = false) async {
         guard state.status != .loading else { return }
-        state.status = .loading
+        await MainActor.run { state.status = .loading }
+
+        let fetch = fetchFilmsUseCase
+        let getFav = getFavoritesUseCase
 
         do {
-            async let favoritesTask = getFavoritesUseCase.execute()
-            async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: forceRefresh)
-            let (favorites, films) = try await (favoritesTask, filmsTask)
-            state.favoriteIDs = favorites
-            state.films = films
-            state.status = films.isEmpty ? .empty : .loaded
+            let (favorites, films) = try await Task.detached { () -> (Set<String>, [Film]) in
+                async let favoritesTask = getFav.execute()
+                async let filmsTask = fetch.execute(forceRefresh: forceRefresh)
+                return try await (favoritesTask, filmsTask)
+            }.value
+
+            await MainActor.run {
+                state.favoriteIDs = favorites
+                state.films = films
+                state.status = films.isEmpty ? .empty : .loaded
+            }
         } catch {
-            state.status = .error(error.localizedDescription)
+            await MainActor.run { state.status = .error(error.localizedDescription) }
         }
     }
 
@@ -53,10 +61,14 @@ final class FilmsViewModel {
     }
 
     func toggleFavorite(_ film: Film) async {
+        let toggle = toggleFavoriteUseCase
         do {
-            state.favoriteIDs = try await toggleFavoriteUseCase.execute(id: film.id)
+            let favorites = try await Task.detached { () -> Set<String> in
+                try await toggle.execute(id: film.id)
+            }.value
+            await MainActor.run { state.favoriteIDs = favorites }
         } catch {
-            state.snackbar = .disconnected
+            await MainActor.run { state.snackbar = .disconnected }
         }
     }
 

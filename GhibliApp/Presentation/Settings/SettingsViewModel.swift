@@ -26,13 +26,18 @@ final class SettingsViewModel {
     }
 
     func resetCache() async {
+        let clearCache = clearCacheUseCase
+        let clearFavs = clearFavoritesUseCase
+
         do {
-            try await clearCacheUseCase.execute()
-            try await clearFavoritesUseCase.execute()
-            state.cacheMessage = "Cache removido com sucesso"
+            try await Task.detached {
+                try await clearCache.execute()
+                try await clearFavs.execute()
+            }.value
+            await MainActor.run { state.cacheMessage = "Cache removido com sucesso" }
         } catch {
-            state.cacheMessage = "Falha ao limpar cache"
+            await MainActor.run { state.cacheMessage = "Falha ao limpar cache" }
         }
-        state.showResetConfirmation = false
+        await MainActor.run { state.showResetConfirmation = false }
     }
 }

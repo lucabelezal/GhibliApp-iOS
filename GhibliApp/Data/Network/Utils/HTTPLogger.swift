@@ -90,6 +90,9 @@ public final class DefaultHTTPLogger: HTTPLogger {
     }
 }
 
+// MARK: - Sendable
+extension DefaultHTTPLogger: Sendable {}
+
 extension Data {
     var prettyPrintedJSONString: NSString? {
         guard

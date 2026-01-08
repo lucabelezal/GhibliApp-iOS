@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol EndpointRequestFactory {
+public protocol EndpointRequestFactory: Sendable {
     func makeRequest(
         for endpoint: Endpoint,
         baseURL: URL,

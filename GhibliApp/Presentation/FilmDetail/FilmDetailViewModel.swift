@@ -46,23 +46,38 @@ final class FilmDetailViewModel {
     }
 
     func refreshAllSections(forceRefresh: Bool = false) async {
+        let chars = charactersSectionViewModel
+        let locs = locationsSectionViewModel
+        let species = speciesSectionViewModel
+        let vehicles = vehiclesSectionViewModel
+
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.charactersSectionViewModel.load(forceRefresh: forceRefresh) }
-            group.addTask { await self.locationsSectionViewModel.load(forceRefresh: forceRefresh) }
-            group.addTask { await self.speciesSectionViewModel.load(forceRefresh: forceRefresh) }
-            group.addTask { await self.vehiclesSectionViewModel.load(forceRefresh: forceRefresh) }
+            group.addTask { await chars.load(forceRefresh: forceRefresh) }
+            group.addTask { await locs.load(forceRefresh: forceRefresh) }
+            group.addTask { await species.load(forceRefresh: forceRefresh) }
+            group.addTask { await vehicles.load(forceRefresh: forceRefresh) }
         }
     }
 
     func toggleFavorite() async {
+        let toggle = toggleFavoriteUseCase
         do {
-            let favorites = try await toggleFavoriteUseCase.execute(id: film.id)
-            state.isFavorite = favorites.contains(film.id)
+            let filmId = film.id
+            let task = Task.detached { () -> Set<String> in
+                try await toggle.execute(id: filmId)
+            }
+            let favorites = try await task.value
+            await MainActor.run { state.isFavorite = favorites.contains(filmId) }
         } catch {}
     }
 
     private func loadFavoriteState() async {
-        guard let favorites = try? await getFavoritesUseCase.execute() else { return }
-        state.isFavorite = favorites.contains(film.id)
+        let getFav = getFavoritesUseCase
+        let task = Task.detached { () -> Set<String> in
+            try await getFav.execute()
+        }
+        guard let favorites = try? await task.value else { return }
+        let filmId = film.id
+        await MainActor.run { state.isFavorite = favorites.contains(filmId) }
     }
 }

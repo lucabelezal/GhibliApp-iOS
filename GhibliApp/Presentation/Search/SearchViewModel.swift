@@ -56,21 +56,24 @@ final class SearchViewModel {
             }
             return
         }
+        let getFav = getFavoritesUseCase
+        let fetch = fetchFilmsUseCase
 
         do {
-            async let favoritesTask = getFavoritesUseCase.execute()
-            async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: true)
-            let (favorites, films) = try await (favoritesTask, filmsTask)
-            state.favoriteIDs = favorites
+            let (favorites, films) = try await Task.detached { () -> (Set<String>, [Film]) in
+                async let favoritesTask = getFav.execute()
+                async let filmsTask = fetch.execute(forceRefresh: true)
+                return try await (favoritesTask, filmsTask)
+            }.value
+
             let filtered = films.filter { $0.title.localizedCaseInsensitiveContains(query) }
             await MainActor.run {
+                state.favoriteIDs = favorites
                 state.results = filtered
                 state.status = filtered.isEmpty ? .empty : .loaded
             }
         } catch {
-            await MainActor.run {
-                state.status = .error(error.localizedDescription)
-            }
+            await MainActor.run { state.status = .error(error.localizedDescription) }
         }
     }
 
@@ -80,10 +83,14 @@ final class SearchViewModel {
 
     @MainActor
     func toggleFavorite(_ film: Film) async {
+        let toggle = toggleFavoriteUseCase
         do {
-            state.favoriteIDs = try await toggleFavoriteUseCase.execute(id: film.id)
+            let favorites = try await Task.detached { () -> Set<String> in
+                try await toggle.execute(id: film.id)
+            }.value
+            await MainActor.run { state.favoriteIDs = favorites }
         } catch {
-            state.status = .error(error.localizedDescription)
+            await MainActor.run { state.status = .error(error.localizedDescription) }
         }
     }
 

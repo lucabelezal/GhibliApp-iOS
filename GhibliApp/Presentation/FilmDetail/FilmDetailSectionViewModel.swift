@@ -16,32 +16,37 @@ final class FilmDetailSectionViewModel<Item> {
         self.loader = loader
     }
 
-    @MainActor
     func load(forceRefresh: Bool = false) async {
-        guard shouldLoad(forceRefresh: forceRefresh) else { return }
-        state.status = .loading
+        guard await shouldLoad(forceRefresh: forceRefresh) else { return }
+        await MainActor.run { state.status = .loading }
 
         do {
             let items = try await loader(film, forceRefresh)
-            state.items = items
-            state.status = items.isEmpty ? .empty : .loaded
+            await MainActor.run {
+                state.items = items
+                state.status = items.isEmpty ? .empty : .loaded
+            }
         } catch {
-            state.items = []
-            state.status = .error(error.localizedDescription)
+            await MainActor.run {
+                state.items = []
+                state.status = .error(error.localizedDescription)
+            }
         }
     }
 
-    private func shouldLoad(forceRefresh: Bool) -> Bool {
+    private func shouldLoad(forceRefresh: Bool) async -> Bool {
         if forceRefresh { return true }
-        switch state.status {
-        case .loading:
-            return false
-        case .idle:
-            return true
-        case .error:
-            return true
-        case .loaded, .empty:
-            return state.items.isEmpty
+        return await MainActor.run {
+            switch state.status {
+            case .loading:
+                return false
+            case .idle:
+                return true
+            case .error:
+                return true
+            case .loaded, .empty:
+                return state.items.isEmpty
+            }
         }
     }
 }
