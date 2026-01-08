@@ -27,58 +27,67 @@ struct FilmsView: View {
 
     private var content: some View {
         List {
-            VStack(spacing: 0) {
-                if viewModel.state.isOffline {
-                    Text("Você está offline - exibindo cache")
-                        .font(.footnote)
-                        .padding(8)
-                        .glassBackground(cornerRadius: 16)
+            if viewModel.state.isOffline {
+                Text("Você está offline - exibindo cache")
+                    .font(.footnote)
+                    .padding(8)
+                    .glassBackground(cornerRadius: 16)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+
+            switch viewModel.state.status {
+            case .idle, .loading:
+                ForEach(0..<shimmerPlaceholderCount, id: \.self) { index in
+                    FilmRowShimmerRow(
+                        isFirst: index == 0, isLast: index == shimmerPlaceholderCount - 1)
                 }
 
-                switch viewModel.state.status {
-                case .idle, .loading:
-                    FilmListShimmers(count: shimmerPlaceholderCount)
-                        .padding(.top, 16)
+            case .error(let message):
+                ErrorView(message: message, retryTitle: "Tentar novamente") {
+                    Task { await viewModel.load(forceRefresh: true) }
+                }
+                .padding(.top, 24)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
 
-                case .error(let message):
-                    ErrorView(message: message, retryTitle: "Tentar novamente") {
-                        Task { await viewModel.load(forceRefresh: true) }
-                    }
-                    .padding(.top, 24)
+            case .empty:
+                EmptyStateView(
+                    title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde"
+                )
+                .padding(.top, 24)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
 
-                case .empty:
-                    EmptyStateView(
-                        title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde"
-                    )
-                    .padding(.top, 24)
+            case .loaded:
+                ForEach(viewModel.state.films, id: \.id) { film in
+                    VStack(spacing: 0) {
+                        Button {
+                            openDetail(film)
+                        } label: {
+                            FilmRowView(
+                                film: film,
+                                isFavorite: viewModel.isFavorite(film),
+                                onToggleFavorite: {
+                                    Task { await viewModel.toggleFavorite(film) }
+                                }
+                            )
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.plain)
 
-                case .loaded:
-                    ForEach(viewModel.state.films, id: \.id) { film in
-                        VStack(spacing: 0) {
-                            Button {
-                                openDetail(film)
-                            } label: {
-                                FilmRowView(
-                                    film: film,
-                                    isFavorite: viewModel.isFavorite(film),
-                                    onToggleFavorite: {
-                                        Task { await viewModel.toggleFavorite(film) }
-                                    }
-                                )
-                                .padding(.vertical, 16)
-                            }
-                            .buttonStyle(.plain)
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-
-                            if film.id != viewModel.state.films.last?.id {
-                                Divider()
-                            }
+                        if film.id != viewModel.state.films.last?.id {
+                            Divider()
                         }
                     }
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .listRowBackground(Color.clear)
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder
@@ -97,21 +106,24 @@ struct FilmsView: View {
     }
 }
 
-private struct FilmListShimmers: View {
-    let count: Int
+private struct FilmRowShimmerRow: View {
+    let isFirst: Bool
+    let isLast: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(0..<count, id: \.self) { index in
-                VStack(spacing: 0) {
-                    FilmRowShimmerView()
-                        .padding(.vertical, 16)
+            FilmRowShimmerView()
+                .padding(.horizontal, 16)
+                .padding(.top, isFirst ? 16 : 0)
+                .padding(.bottom, 16)
 
-                    if index != count - 1 {
-                        Divider()
-                    }
-                }
+            if isLast == false {
+                Divider()
+                    .padding(.leading, 16)
             }
         }
+        .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 }

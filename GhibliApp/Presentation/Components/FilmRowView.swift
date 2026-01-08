@@ -139,7 +139,9 @@ struct FilmRowShimmerView: View {
             }
             .frame(width: 44, height: 150)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
+        .padding(.top, 16)
         .overlay(alignment: .topTrailing) {
             ShimmerView()
                 .frame(width: 20, height: 20)

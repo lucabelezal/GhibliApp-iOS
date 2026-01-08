@@ -10,6 +10,7 @@ actor APIClient {
     }
 
     func send<T: Decodable & Sendable>(_ request: URLRequest, responseType: T.Type) async throws -> T {
+        
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
