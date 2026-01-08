@@ -1,6 +1,6 @@
 import Foundation
 
-public final class URLSessionAdapter: HTTPClient {
+public actor URLSessionAdapter: HTTPClient {
     private let session: URLSession
     private let baseURL: URL
     private let baseQueryItems: [URLQueryItem]
@@ -25,7 +25,7 @@ public final class URLSessionAdapter: HTTPClient {
     }
 
     public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
-        let request = try requestFactory.makeRequest(
+        let request = try await requestFactory.makeRequest(
             for: endpoint,
             baseURL: baseURL,
             baseQueryItems: baseQueryItems,
@@ -33,7 +33,7 @@ public final class URLSessionAdapter: HTTPClient {
         )
 
         #if DEBUG
-            logger?.logRequest(request, endpoint: endpoint)
+            await logger?.logRequest(request, endpoint: endpoint)
         #endif
 
         do {
@@ -45,7 +45,8 @@ public final class URLSessionAdapter: HTTPClient {
             )
 
             #if DEBUG
-                logger?.logResponse(response as? HTTPURLResponse, data: data, endpoint: endpoint)
+                await logger?.logResponse(
+                    response as? HTTPURLResponse, data: data, endpoint: endpoint)
             #endif
             switch result {
             case .success(let value):
@@ -63,6 +64,3 @@ public final class URLSessionAdapter: HTTPClient {
     }
 
 }
-
-// MARK: - Sendable
-extension URLSessionAdapter: Sendable {}

@@ -6,25 +6,22 @@ protocol FavoritesStoreProtocol: Sendable {
     func clear() async throws
 }
 
-struct UserDefaultsFavoritesStore: FavoritesStoreProtocol {
+actor UserDefaultsFavoritesStore: FavoritesStoreProtocol {
     private let key = "GhibliApp.Favorites"
-    private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-    }
+    init() {}
 
     func load() async throws -> Set<String> {
-        let ids = defaults.stringArray(forKey: key) ?? []
+        let ids = UserDefaults.standard.stringArray(forKey: key) ?? []
         return Set(ids)
     }
 
     func save(ids: Set<String>) async throws {
-        defaults.set(Array(ids), forKey: key)
+        UserDefaults.standard.set(Array(ids), forKey: key)
     }
 
     func clear() async throws {
-        defaults.removeObject(forKey: key)
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }
 

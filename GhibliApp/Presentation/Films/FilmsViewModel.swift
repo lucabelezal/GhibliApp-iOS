@@ -38,11 +38,12 @@ final class FilmsViewModel {
 
         let fetch = fetchFilmsUseCase
         let getFav = getFavoritesUseCase
+        let force = forceRefresh
 
         do {
             let (favorites, films) = try await Task.detached { () -> (Set<String>, [Film]) in
                 async let favoritesTask = getFav.execute()
-                async let filmsTask = fetch.execute(forceRefresh: forceRefresh)
+                async let filmsTask = fetch.execute(forceRefresh: force)
                 return try await (favoritesTask, filmsTask)
             }.value
 

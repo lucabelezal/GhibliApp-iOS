@@ -49,8 +49,9 @@ final class FavoritesViewModel {
     func toggle(_ film: Film) async {
         let toggle = toggleFavoriteUseCase
         do {
+            let filmId = film.id
             let favorites = try await Task.detached { () -> Set<String> in
-                try await toggle.execute(id: film.id)
+                try await toggle.execute(id: filmId)
             }.value
             favoriteIDs = favorites
             await MainActor.run {

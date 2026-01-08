@@ -5,7 +5,7 @@ public protocol HTTPLogger: Sendable {
     func logResponse(_ response: HTTPURLResponse?, data: Data?, endpoint: Endpoint)
 }
 
-public final class DefaultHTTPLogger: HTTPLogger {
+@MainActor public final class DefaultHTTPLogger: HTTPLogger {
     public init() {}
 
     public func logRequest(_ request: URLRequest?, endpoint: Endpoint) {
@@ -89,9 +89,6 @@ public final class DefaultHTTPLogger: HTTPLogger {
         }
     }
 }
-
-// MARK: - Sendable
-extension DefaultHTTPLogger: Sendable {}
 
 extension Data {
     var prettyPrintedJSONString: NSString? {

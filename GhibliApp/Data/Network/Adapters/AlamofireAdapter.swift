@@ -1,7 +1,7 @@
 import Alamofire
 import Foundation
 
-public final class AlamofireAdapter: HTTPClient {
+public actor AlamofireAdapter: HTTPClient {
 	private let session: Session
 	private let baseURL: URL
 	private let baseQueryItems: [URLQueryItem]
@@ -26,7 +26,7 @@ public final class AlamofireAdapter: HTTPClient {
 	}
 
 	public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
-		let urlRequest = try requestFactory.makeRequest(
+		let urlRequest = try await requestFactory.makeRequest(
 			for: endpoint,
 			baseURL: baseURL,
 			baseQueryItems: baseQueryItems,
@@ -37,8 +37,8 @@ public final class AlamofireAdapter: HTTPClient {
 		let response = await request.serializingData().response
 
 		#if DEBUG
-			logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
-			logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
+			await logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
+			await logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
 		#endif
 
 		let result: Result<T> = handleResponse(
@@ -57,10 +57,3 @@ public final class AlamofireAdapter: HTTPClient {
 
 	// logging handled via injected `HTTPLogger` (DEBUG only)
 }
-
-// NOTE: Alamofire's `Session` is a reference type from an external library
-// that we did not fully audit for `Sendable` semantics here. To allow
-// using `AlamofireAdapter` in detached tasks without a larger adapter
-// refactor, mark it as `@unchecked Sendable`. Prefer a deeper refactor
-// (wrapping or ensuring session immutability) in follow-up work.
-extension AlamofireAdapter: @unchecked Sendable {}

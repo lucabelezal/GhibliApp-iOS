@@ -8,11 +8,11 @@ enum GhibliEndpoint: Endpoint {
     case vehicles
     case absolute(URL)
 
-    var parameterEncoding: ParameterEncoding { .url }
-    var requestType: RequestType { .request }
-    var method: HTTPMethod { .get }
+    nonisolated var parameterEncoding: ParameterEncoding { .url }
+    nonisolated var requestType: RequestType { .request }
+    nonisolated var method: HTTPMethod { .get }
 
-    var path: String {
+    nonisolated var path: String {
         switch self {
         case .films:
             return "/films"
@@ -29,7 +29,7 @@ enum GhibliEndpoint: Endpoint {
         }
     }
 
-    var parameters: [String: Sendable]? { nil }
-    var headers: [String: String]? { nil }
-    var queryItems: [URLQueryItem]? { nil }
+    nonisolated var parameters: [String: Sendable]? { nil }
+    nonisolated var headers: [String: String]? { nil }
+    nonisolated var queryItems: [URLQueryItem]? { nil }
 }

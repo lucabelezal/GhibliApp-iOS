@@ -18,11 +18,11 @@ public enum ParameterEncoding {
 }
 
 public protocol Endpoint: Sendable {
-	var parameterEncoding: ParameterEncoding { get }
-	var requestType: RequestType { get }
-	var method: HTTPMethod { get }
-	var path: String { get }
-	var parameters: [String: Sendable]? { get }
-	var headers: [String: String]? { get }
-	var queryItems: [URLQueryItem]? { get }
+	nonisolated var parameterEncoding: ParameterEncoding { get }
+	nonisolated var requestType: RequestType { get }
+	nonisolated var method: HTTPMethod { get }
+	nonisolated var path: String { get }
+	nonisolated var parameters: [String: Sendable]? { get }
+	nonisolated var headers: [String: String]? { get }
+	nonisolated var queryItems: [URLQueryItem]? { get }
 }

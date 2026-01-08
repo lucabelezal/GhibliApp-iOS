@@ -108,7 +108,7 @@ public struct DefaultEndpointRequestFactory: EndpointRequestFactory {
             }
         }
     }
-
+    // ensure helpers are callable from other execution contexts
     private func makeQueryItems(from parameters: [String: Sendable]) -> [URLQueryItem] {
         parameters.map { key, value in
             URLQueryItem(name: key, value: stringValue(from: value))

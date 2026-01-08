@@ -73,11 +73,11 @@ final class FilmDetailViewModel {
 
     private func loadFavoriteState() async {
         let getFav = getFavoritesUseCase
+        let filmId = film.id
         let task = Task.detached { () -> Set<String> in
             try await getFav.execute()
         }
         guard let favorites = try? await task.value else { return }
-        let filmId = film.id
         await MainActor.run { state.isFavorite = favorites.contains(filmId) }
     }
 }
