@@ -142,7 +142,7 @@ final class FilmsViewModel: ObservableObject {
             try? await Task.sleep(
                 nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
             guard let self else { return }
-            await self.dismissSnackbarIfNeeded(for: state)
+            await MainActor.run { self.dismissSnackbarIfNeeded(for: state) }
         }
     }
 

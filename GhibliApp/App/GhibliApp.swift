@@ -7,6 +7,7 @@ struct GhibliApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(router: container.router, container: container)
+                .setAppearanceTheme()
         }
     }
 }
