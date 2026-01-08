@@ -17,18 +17,21 @@ final class AppContainer {
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
     private init() {
-        let apiClient = APIClient()
-        let apiAdapter = GhibliAPIAdapter(client: apiClient)
+        let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
+        let httpClient = URLSessionAdapter(baseURL: apiBaseURL)
         let cacheStore = SwiftDataCacheStore.shared
-        let filmRepository: FilmRepository = FilmRepositoryImpl(api: apiAdapter, cache: cacheStore)
+        let filmRepository: FilmRepository = FilmRepositoryImpl(
+            client: httpClient, cache: cacheStore)
         let peopleRepository: PeopleRepository = PeopleRepositoryImpl(
-            api: apiAdapter, cache: cacheStore)
+            client: httpClient,
+            baseURL: apiBaseURL,
+            cache: cacheStore)
         let locationsRepository: LocationsRepository = LocationsRepositoryImpl(
-            api: apiAdapter, cache: cacheStore)
+            client: httpClient, cache: cacheStore)
         let speciesRepository: SpeciesRepository = SpeciesRepositoryImpl(
-            api: apiAdapter, cache: cacheStore)
+            client: httpClient, cache: cacheStore)
         let vehiclesRepository: VehiclesRepository = VehiclesRepositoryImpl(
-            api: apiAdapter, cache: cacheStore)
+            client: httpClient, cache: cacheStore)
         let favoritesStore: FavoritesStoreAdapter = SwiftDataFavoritesStore()
         let favoritesService = FavoritesService(store: favoritesStore)
         let favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(
