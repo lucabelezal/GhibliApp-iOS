@@ -575,7 +575,7 @@
 				6E6A82A02F0D50EA00857D5A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		6E6A82A12F0D50EA00857D5A /* Build configuration list for PBXNativeTarget "GhibliApp" */ = {
 			isa = XCConfigurationList;
@@ -584,7 +584,7 @@
 				6E6A82A32F0D50EA00857D5A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		6E6A82A42F0D50EA00857D5A /* Build configuration list for PBXNativeTarget "GhibliAppTests" */ = {
 			isa = XCConfigurationList;
@@ -593,7 +593,7 @@
 				6E6A82A62F0D50EA00857D5A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		6E6A82A72F0D50EA00857D5A /* Build configuration list for PBXNativeTarget "GhibliAppUITests" */ = {
 			isa = XCConfigurationList;
@@ -602,7 +602,7 @@
 				6E6A82A92F0D50EA00857D5A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 

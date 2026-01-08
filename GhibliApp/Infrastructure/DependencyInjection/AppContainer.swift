@@ -18,7 +18,13 @@ final class AppContainer {
 
     private init() {
         let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
-        let httpClient = URLSessionAdapter(baseURL: apiBaseURL)
+        #if DEBUG
+        let httpLogger: HTTPLogger? = DefaultHTTPLogger()
+        #else
+        let httpLogger: HTTPLogger? = nil
+        #endif
+
+        let httpClient = URLSessionAdapter(baseURL: apiBaseURL, logger: httpLogger)
         let cacheStore = SwiftDataCacheStore.shared
         let filmRepository: FilmRepository = FilmRepositoryImpl(
             client: httpClient, cache: cacheStore)

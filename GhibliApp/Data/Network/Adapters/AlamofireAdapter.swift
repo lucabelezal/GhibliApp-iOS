@@ -3,30 +3,42 @@ import Foundation
 
 public final class AlamofireAdapter: HTTPClient {
 	private let session: Session
-	private let requestBuilder: EndpointRequestBuilder
+	private let baseURL: URL
+	private let baseQueryItems: [URLQueryItem]
+	private let timeoutInterval: TimeInterval
+	private let requestFactory: EndpointRequestFactory
+	private let logger: HTTPLogger?
 
 	public init(
 		baseURL: URL,
 		baseQueryItems: [URLQueryItem] = [],
 		timeoutInterval: TimeInterval = 30,
-		session: Session = .default
+		session: Session = .default,
+		requestFactory: EndpointRequestFactory = DefaultEndpointRequestFactory(),
+		logger: HTTPLogger? = nil
 	) {
 		self.session = session
-		self.requestBuilder = EndpointRequestBuilder(
+		self.baseURL = baseURL
+		self.baseQueryItems = baseQueryItems
+		self.timeoutInterval = timeoutInterval
+		self.requestFactory = requestFactory
+		self.logger = logger
+	}
+
+	public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
+		let urlRequest = try requestFactory.makeRequest(
+			for: endpoint,
 			baseURL: baseURL,
 			baseQueryItems: baseQueryItems,
 			timeoutInterval: timeoutInterval
 		)
-	}
-
-	public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
-		let urlRequest = try requestBuilder.makeRequest(from: endpoint)
 		let request = session.request(urlRequest)
 
 		let response = await request.serializingData().response
 
 		#if DEBUG
-			logResponse(response, endpoint: endpoint)
+			logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
+			logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
 		#endif
 
 		let result: Result<T> = handleResponse(
@@ -43,12 +55,5 @@ public final class AlamofireAdapter: HTTPClient {
 		}
 	}
 
-	#if DEBUG
-		private func logResponse(_ response: AFDataResponse<Data>, endpoint: Endpoint) {
-			response.request?.debugPrint(with: endpoint)
-			response.response?.debugPrint(data: response.data, with: endpoint)
-		}
-	#endif
+	// logging handled via injected `HTTPLogger` (DEBUG only)
 }
-
-extension AlamofireAdapter: @unchecked Sendable {}
