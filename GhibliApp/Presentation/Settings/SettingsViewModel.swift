@@ -1,13 +1,13 @@
+import Combine
 import Foundation
-import Observation
 
-@Observable
 @MainActor
-final class SettingsViewModel {
-    var state = SettingsViewState()
+final class SettingsViewModel: ObservableObject {
+    @Published private(set) var state: ViewState<SettingsViewContent> = .loaded(.initial)
 
     private let clearCacheUseCase: ClearCacheUseCase
     private let clearFavoritesUseCase: ClearFavoritesUseCase
+    private var notificationDismissTask: Task<Void, Never>?
 
     init(
         clearCacheUseCase: ClearCacheUseCase,
@@ -17,27 +17,76 @@ final class SettingsViewModel {
         self.clearFavoritesUseCase = clearFavoritesUseCase
     }
 
+    deinit {
+        notificationDismissTask?.cancel()
+    }
+
     func presentReset() {
-        state.showResetConfirmation = true
+        updateContent { $0.presentingReset(true) }
     }
 
     func dismissReset() {
-        state.showResetConfirmation = false
+        updateContent { $0.presentingReset(false) }
     }
 
     func resetCache() async {
-        let clearCache = clearCacheUseCase
-        let clearFavs = clearFavoritesUseCase
+        guard var content = currentContent else { return }
+        state = .refreshing(content.updatingResetting(true))
 
         do {
-            try await Task.detached {
-                try await clearCache.execute()
-                try await clearFavs.execute()
-            }.value
-            await MainActor.run { state.cacheMessage = "Cache removido com sucesso" }
+            async let cacheTask: Void = clearCacheUseCase.execute()
+            async let favoritesTask: Void = clearFavoritesUseCase.execute()
+            _ = try await (cacheTask, favoritesTask)
+
+            content =
+                content
+                .updatingResetting(false)
+                .presentingReset(false)
+                .notifying(
+                    SettingsNotification(message: "Cache removido com sucesso", kind: .success))
+            state = .loaded(content)
+            scheduleNotificationDismiss()
         } catch {
-            await MainActor.run { state.cacheMessage = "Falha ao limpar cache" }
+            content =
+                content
+                .updatingResetting(false)
+                .presentingReset(false)
+                .notifying(SettingsNotification(message: "Falha ao limpar cache", kind: .failure))
+            state = .loaded(content)
+            scheduleNotificationDismiss()
         }
-        await MainActor.run { state.showResetConfirmation = false }
+    }
+
+    func dismissNotification() {
+        updateContent { $0.notifying(nil) }
+    }
+
+    private func scheduleNotificationDismiss() {
+        notificationDismissTask?.cancel()
+        notificationDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                self?.dismissNotification()
+            }
+        }
+    }
+
+    private var currentContent: SettingsViewContent? {
+        switch state {
+        case .loaded(let content), .refreshing(let content):
+            return content
+        default:
+            return nil
+        }
+    }
+
+    private func updateContent(_ transform: (SettingsViewContent) -> SettingsViewContent) {
+        guard let content = currentContent else { return }
+        let updated = transform(content)
+        if case .refreshing = state {
+            state = .refreshing(updated)
+        } else {
+            state = .loaded(updated)
+        }
     }
 }

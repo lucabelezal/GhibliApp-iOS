@@ -1,21 +1,19 @@
+import Combine
 import Foundation
-import Observation
 
-private final class SearchViewModelTasks {
-    var searchTask: Task<Void, Never>?
-    var connectivityTask: Task<Void, Never>?
-}
-
-@Observable
 @MainActor
-final class SearchViewModel {
-    var state = SearchViewState()
+final class SearchViewModel: ObservableObject {
+    @Published private(set) var state: ViewState<SearchViewContent> = .idle
+    @Published private(set) var query: String = ""
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
-    private let __tasks = SearchViewModelTasks()
+
+    private var searchTask: Task<Void, Never>?
+    private var connectivityTask: Task<Void, Never>?
+    private var isOffline = false
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,
@@ -30,82 +28,104 @@ final class SearchViewModel {
         listenConnectivity()
     }
 
-    deinit {}
+    deinit {
+        searchTask?.cancel()
+        connectivityTask?.cancel()
+    }
 
-    func updateQuery(_ query: String) {
-        state.query = query
-        __tasks.searchTask?.cancel()
-        guard !query.isEmpty else {
-            state.results = []
-            state.status = .idle
+    func updateQuery(_ newValue: String) {
+        query = newValue
+        searchTask?.cancel()
+        guard newValue.isEmpty == false else {
+            state = .idle
             return
         }
 
-        __tasks.searchTask = Task { [weak self] in
+        searchTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled, let self else { return }
-            await MainActor.run { self.state.status = .loading }
-            await performSearch(query: query)
+            await self.performSearch(query: newValue)
+        }
+    }
+
+    func toggleFavorite(_ film: Film) async {
+        do {
+            let favorites = try await toggleFavoriteUseCase.execute(id: film.id)
+            applyFavorites(favorites)
+        } catch {
+            state = .error(.from(error))
         }
     }
 
     private func performSearch(query: String) async {
-        if state.isOffline {
-            await MainActor.run {
-                state.status = .error("Sem conexão para buscar filmes")
-            }
+        guard isOffline == false else {
+            state = .error(.offline(message: "Sem conexão para buscar filmes"))
             return
         }
-        let getFav = getFavoritesUseCase
-        let fetch = fetchFilmsUseCase
 
+        state = .loading
         do {
-            let (favorites, films) = try await Task.detached { () -> (Set<String>, [Film]) in
-                async let favoritesTask = getFav.execute()
-                async let filmsTask = fetch.execute(forceRefresh: true)
-                return try await (favoritesTask, filmsTask)
-            }.value
-
+            async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: true)
+            async let favoritesTask = getFavoritesUseCase.execute()
+            let films = try await filmsTask
+            let favorites = try await favoritesTask
             let filtered = films.filter { $0.title.localizedCaseInsensitiveContains(query) }
-            await MainActor.run {
-                state.favoriteIDs = favorites
-                state.results = filtered
-                state.status = filtered.isEmpty ? .empty : .loaded
-            }
+            let content = SearchViewContent(results: filtered, favoriteIDs: favorites)
+            state = filtered.isEmpty ? .empty : .loaded(content)
         } catch {
-            await MainActor.run { state.status = .error(error.localizedDescription) }
+            state = .error(.from(error))
         }
     }
 
-    func isFavorite(_ film: Film) -> Bool {
-        state.favoriteIDs.contains(film.id)
-    }
-
-    @MainActor
-    func toggleFavorite(_ film: Film) async {
-        let toggle = toggleFavoriteUseCase
-        do {
-            let filmId = film.id
-            let favorites = try await Task.detached { () -> Set<String> in
-                try await toggle.execute(id: filmId)
-            }.value
-            await MainActor.run { state.favoriteIDs = favorites }
-        } catch {
-            await MainActor.run { state.status = .error(error.localizedDescription) }
-        }
+    private func applyFavorites(_ favorites: Set<String>) {
+        guard let content = currentContent else { return }
+        replaceLoadedState(with: content.updatingFavorites(favorites))
     }
 
     private func listenConnectivity() {
-        __tasks.connectivityTask = Task { [weak self] in
-            guard let self else { return }
-            for await status in observeConnectivityUseCase.stream {
+        connectivityTask = Task { [observeConnectivityUseCase] in
+            for await isConnected in observeConnectivityUseCase.stream {
                 await MainActor.run {
-                    self.state.isOffline = !status
-                    if !status {
-                        self.state.status = .error("Sem conexão para buscar filmes")
-                    }
+                    self.handleConnectivityChange(isConnected: isConnected)
                 }
             }
         }
+    }
+
+    private func handleConnectivityChange(isConnected: Bool) {
+        isOffline = !isConnected
+
+        if isOffline {
+            state = .error(.offline(message: "Sem conexão para buscar filmes"))
+            return
+        }
+
+        guard query.isEmpty == false else {
+            state = .idle
+            return
+        }
+
+        searchTask?.cancel()
+        searchTask = Task { [weak self] in
+            guard let self else { return }
+            await self.performSearch(query: self.query)
+        }
+    }
+
+    private func replaceLoadedState(with content: SearchViewContent) {
+        switch state {
+        case .refreshing:
+            state = .refreshing(content)
+        case .loaded:
+            state = .loaded(content)
+        default:
+            state = content.isEmpty ? .empty : .loaded(content)
+        }
+    }
+
+    private var currentContent: SearchViewContent? {
+        if case .loaded(let content) = state { return content }
+        if case .refreshing(let content) = state { return content }
+        return nil
     }
 }

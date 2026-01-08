@@ -1,10 +1,3 @@
-//
-//  GhibliAppTests.swift
-//  GhibliAppTests
-//
-//  Created by Lucas Nascimento on 06/01/26.
-//
-
 import Testing
 @testable import GhibliApp
 

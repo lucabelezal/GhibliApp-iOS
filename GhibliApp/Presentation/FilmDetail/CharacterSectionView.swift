@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Seção de personagens usando o container compartilhado.
 struct CharacterSectionView: View {
-    @Bindable var viewModel: FilmDetailSectionViewModel<Person>
+    @ObservedObject var viewModel: FilmDetailSectionViewModel<Person>
 
     var body: some View {
         FilmDetailCarouselSectionView(

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FilmDetailView: View {
-    @Bindable var viewModel: FilmDetailViewModel
+    @ObservedObject var viewModel: FilmDetailViewModel
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -15,9 +15,6 @@ struct FilmDetailView: View {
                     .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 16) {
-                        // Title is shown in the header; keep a small spacer here.
-
-                        // Info card full-width
                         VStack(alignment: .leading, spacing: 12) {
                             InfoRow(label: "Director", value: viewModel.film.director)
                             InfoRow(label: "Producer", value: viewModel.film.producer)
@@ -72,9 +69,8 @@ struct FilmDetailView: View {
                 Button {
                     Task { await viewModel.toggleFavorite() }
                 } label: {
-                    Image(systemName: viewModel.state.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(
-                            viewModel.state.isFavorite ? Color.yellow : Color.secondary)
+                    Image(systemName: viewModel.isFavorite ? "heart.fill" : "heart")
+                        .foregroundStyle(viewModel.isFavorite ? Color.yellow : Color.secondary)
                 }
             }
         }
@@ -149,7 +145,6 @@ struct FilmDetailView: View {
                         .frame(width: geo.size.width, height: headerHeight)
                         .allowsHitTesting(false)
 
-                    // Title overlay
                     if let title {
                         Text(title)
                             .font(.largeTitle)

@@ -1,13 +1,13 @@
+import Combine
 import Foundation
-import Observation
 
-@Observable
-final class FilmDetailSectionViewModel<Item> {
+final class FilmDetailSectionViewModel<Item>: ObservableObject {
     private let film: Film
     private let loader: (_ film: Film, _ forceRefresh: Bool) async throws -> [Item]
 
-    var state = SectionState<Item>()
+    @Published private(set) var state: ViewState<[Item]> = .idle
 
+    @MainActor
     init(
         film: Film,
         loader: @escaping (_ film: Film, _ forceRefresh: Bool) async throws -> [Item]
@@ -16,38 +16,60 @@ final class FilmDetailSectionViewModel<Item> {
         self.loader = loader
     }
 
+    @MainActor
     func load(forceRefresh: Bool = false) async {
-        guard await shouldLoad(forceRefresh: forceRefresh) else { return }
-        await MainActor.run { state.status = .loading }
+        guard canLoad(forceRefresh: forceRefresh) else { return }
+        if forceRefresh, let currentItems {
+            state = .refreshing(currentItems)
+        } else {
+            state = .loading
+        }
 
         do {
             let items = try await loader(film, forceRefresh)
-            await MainActor.run {
-                state.items = items
-                state.status = items.isEmpty ? .empty : .loaded
-            }
+            applyLoadedItems(items)
         } catch {
-            await MainActor.run {
-                state.items = []
-                state.status = .error(error.localizedDescription)
-            }
+            state = .error(.from(error))
         }
     }
 
-    private func shouldLoad(forceRefresh: Bool) async -> Bool {
-        if forceRefresh { return true }
-        return await MainActor.run {
-            switch state.status {
-            case .loading:
-                return false
-            case .idle:
-                return true
-            case .error:
-                return true
-            case .loaded, .empty:
-                return state.items.isEmpty
-            }
+    @MainActor
+    private var currentItems: [Item]? {
+        switch state {
+        case .loaded(let items), .refreshing(let items):
+            return items
+        default:
+            return nil
         }
+    }
+
+    @MainActor
+    private func canLoad(forceRefresh: Bool) -> Bool {
+        switch state {
+        case .loading, .refreshing:
+            return false
+        case .loaded(let items):
+            return forceRefresh || items.isEmpty
+        case .empty:
+            return forceRefresh
+        default:
+            return true
+        }
+    }
+
+    @MainActor
+    private func applyLoadedItems(_ items: [Item]) {
+        state = items.isEmpty ? .empty : .loaded(items)
+    }
+
+    @MainActor
+    public func setItems(_ items: [Item]) {
+        applyLoadedItems(items)
+    }
+
+    @MainActor
+    public func setError(_ error: Error) {
+        state = .error(.from(error))
     }
 }
 

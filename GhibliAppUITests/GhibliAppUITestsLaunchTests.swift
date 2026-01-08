@@ -1,10 +1,3 @@
-//
-//  GhibliAppUITestsLaunchTests.swift
-//  GhibliAppUITests
-//
-//  Created by Lucas Nascimento on 06/01/26.
-//
-
 import XCTest
 
 final class GhibliAppUITestsLaunchTests: XCTestCase {

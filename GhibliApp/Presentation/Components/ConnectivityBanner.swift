@@ -28,3 +28,5 @@ struct ConnectivityBanner: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
+
+extension ConnectivityBanner.State: Sendable {}

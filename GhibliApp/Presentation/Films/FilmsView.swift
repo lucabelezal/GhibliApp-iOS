@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct FilmsView: View {
-    @State private var isRefreshing = false
-    @Bindable var viewModel: FilmsViewModel
+    @ObservedObject var viewModel: FilmsViewModel
     let openDetail: (Film) -> Void
     private let placeholderCount = 6
 
@@ -19,39 +18,23 @@ struct FilmsView: View {
             await viewModel.load()
         }
         .refreshable {
-            isRefreshing = true
-            await viewModel.load(forceRefresh: true)
-            isRefreshing = false
+            await viewModel.refresh()
         }
     }
 
     private var content: some View {
         List {
-            if viewModel.state.isOffline {
-                Text("Você está offline - exibindo cache")
-                    .font(.footnote)
-                    .padding(8)
-                    .glassBackground(cornerRadius: 16)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-            }
-
-            switch viewModel.state.status {
+            switch viewModel.state {
             case .idle, .loading:
                 ForEach(0..<placeholderCount, id: \.self) { index in
                     FilmRowPlaceholderRow(
                         isFirst: index == 0, isLast: index == placeholderCount - 1
                     )
                 }
-
-            case .error(let message):
-                ErrorView(message: message, retryTitle: "Tentar novamente") {
-                    Task { await viewModel.load(forceRefresh: true) }
-                }
-                .padding(.top, 24)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
+            case .refreshing(let content):
+                filmsList(for: content)
+            case .loaded(let content):
+                filmsList(for: content)
             case .empty:
                 EmptyStateView(
                     title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde"
@@ -59,42 +42,30 @@ struct FilmsView: View {
                 .padding(.top, 24)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-
-            case .loaded:
-                ForEach(viewModel.state.films, id: \.id) { film in
-                    VStack(spacing: 0) {
-                        Button {
-                            openDetail(film)
-                        } label: {
-                            FilmRowView(
-                                film: film,
-                                isFavorite: viewModel.isFavorite(film),
-                                onToggleFavorite: {
-                                    Task { await viewModel.toggleFavorite(film) }
-                                }
-                            )
-                            .padding(.vertical, 16)
-                            .padding(.horizontal, 16)
-                        }
-                        .buttonStyle(.plain)
-
-                        if film.id != viewModel.state.films.last?.id {
-                            Divider()
-                        }
-                    }
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
-                    .listRowBackground(Color.clear)
+            case .error(let error):
+                ErrorView(message: error.message, retryTitle: "Tentar novamente") {
+                    Task { await viewModel.load(forceRefresh: true) }
                 }
+                .padding(.top, 24)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .overlay(alignment: .top) {
+            if case .refreshing = viewModel.state {
+                ProgressView()
+                    .padding()
+                    .background(.thinMaterial, in: Capsule())
+                    .padding(.top, 8)
+            }
+        }
     }
 
     @ViewBuilder
     private var snackbar: some View {
-        if let snackbarState = viewModel.state.snackbar {
+        if let snackbarState = viewModel.currentContent?.snackbar {
             VStack {
                 ConnectivityBanner(state: snackbarState) {
                     viewModel.dismissSnackbar()
@@ -104,6 +75,44 @@ struct FilmsView: View {
             }
             .transition(.move(edge: .top).combined(with: .opacity))
             .animation(.spring(), value: snackbarState)
+        }
+    }
+
+    @ViewBuilder
+    private func filmsList(for content: FilmsViewContent) -> some View {
+        if content.isOffline {
+            Text("Você está offline - exibindo cache")
+                .font(.footnote)
+                .padding(8)
+                .glassBackground(cornerRadius: 16)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+        }
+
+        ForEach(content.items) { item in
+            VStack(spacing: 0) {
+                Button {
+                    openDetail(item.film)
+                } label: {
+                    FilmRowView(
+                        film: item.film,
+                        isFavorite: item.isFavorite,
+                        onToggleFavorite: {
+                            Task { await viewModel.toggleFavorite(item.film) }
+                        }
+                    )
+                    .padding(.vertical, 16)
+                    .padding(.horizontal, 16)
+                }
+                .buttonStyle(.plain)
+
+                if item.id != content.items.last?.id {
+                    Divider()
+                }
+            }
+            .listRowSeparator(.hidden)
+            .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowBackground(Color.clear)
         }
     }
 }

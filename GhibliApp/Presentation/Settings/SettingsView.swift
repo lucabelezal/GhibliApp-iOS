@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Bindable var viewModel: SettingsViewModel
+    @ObservedObject var viewModel: SettingsViewModel
 
     @AppStorage(UserDefaultsKeys.appearanceTheme)
     private var appearanceTheme: AppearanceTheme = .system
@@ -16,19 +16,57 @@ struct SettingsView: View {
     private var notificationsEnabled: Bool = true
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             AppBackground()
-            form
-            if viewModel.state.showResetConfirmation {
-                resetDialog
-                    .transition(.scale.combined(with: .opacity))
-            }
+            content()
         }
-        .animation(.spring(), value: viewModel.state.showResetConfirmation)
-        .overlay(messageBanner, alignment: .bottom)
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle("Ajustes")
         .setAppearanceTheme()
+    }
+
+    @ViewBuilder
+    private func content() -> some View {
+        switch viewModel.state {
+        case .idle:
+            Color.clear
+        case .loading:
+            LoadingView()
+        case .refreshing(let content):
+            mainLayout(content)
+                .overlay(alignment: .top) {
+                    if content.isResettingCache {
+                        progressOverlay
+                    }
+                }
+        case .loaded(let content):
+            mainLayout(content)
+                .overlay(alignment: .top) {
+                    if content.isResettingCache {
+                        progressOverlay
+                    }
+                }
+        case .empty:
+            EmptyStateView(title: "Nada para configurar", subtitle: "Volte mais tarde")
+        case .error(let error):
+            ErrorView(message: error.message, retryTitle: "Tentar novamente") {
+                viewModel.dismissNotification()
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private func mainLayout(_ content: SettingsViewContent) -> some View {
+        form
+            .overlay(alignment: .bottom) {
+                messageBanner(for: content.notification)
+            }
+            .overlay {
+                if content.isShowingResetConfirmation {
+                    resetDialog(for: content)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
     }
 
     private var form: some View {
@@ -76,7 +114,7 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
     }
 
-    private var resetDialog: some View {
+    private func resetDialog(for content: SettingsViewContent) -> some View {
         VStack(spacing: 16) {
             Text("Limpar cache?")
                 .font(.headline)
@@ -90,6 +128,7 @@ struct SettingsView: View {
                     Task { await viewModel.resetCache() }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(content.isResettingCache)
             }
         }
         .padding()
@@ -97,18 +136,34 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var messageBanner: some View {
-        if let message = viewModel.state.cacheMessage {
-            Text(message)
+    private func messageBanner(for notification: SettingsNotification?) -> some View {
+        if let notification {
+            Text(notification.message)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(bannerColor(for: notification.kind), in: Capsule())
                 .padding()
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding()
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        viewModel.state.cacheMessage = nil
-                    }
-                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onTapGesture { viewModel.dismissNotification() }
         }
+    }
+
+    private func bannerColor(for kind: SettingsNotification.Kind) -> Color {
+        switch kind {
+        case .success:
+            return Color.green.opacity(0.9)
+        case .failure:
+            return Color.red.opacity(0.9)
+        }
+    }
+
+    private var progressOverlay: some View {
+        ProgressView()
+            .padding()
+            .background(.thinMaterial, in: Capsule())
+            .padding(.top, 16)
     }
 
     private func resetDefaults() {

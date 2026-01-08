@@ -3,7 +3,7 @@ import SwiftUI
 struct FilmDetailCarouselSectionView<Item, Content, Placeholder>: View
 where Item: Identifiable, Content: View, Placeholder: View {
     let title: String
-    let state: SectionState<Item>
+    let state: ViewState<[Item]>
     let emptyMessage: String
     let placeholderCount: Int
     let contentBuilder: (Item) -> Content
@@ -11,7 +11,7 @@ where Item: Identifiable, Content: View, Placeholder: View {
 
     init(
         title: String,
-        state: SectionState<Item>,
+        state: ViewState<[Item]>,
         emptyMessage: String,
         placeholderCount: Int = 3,
         @ViewBuilder contentBuilder: @escaping (Item) -> Content,
@@ -31,35 +31,65 @@ where Item: Identifiable, Content: View, Placeholder: View {
                 .font(.headline)
                 .fontWeight(.semibold)
 
-            switch state.status {
-            case .loading:
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 16) {
-                        ForEach(0..<placeholderCount, id: \.self) { _ in
-                            placeholderBuilder()
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-            case .loaded:
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 16) {
-                        ForEach(state.items) { item in
-                            contentBuilder(item)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .transition(.opacity)
-            case .error(let message):
-                SectionPlaceholderView(message: message)
-            case .empty:
-                SectionPlaceholderView(message: emptyMessage)
+            switch state {
             case .idle:
                 EmptyView()
+            case .loading:
+                placeholderCarousel
+            case .refreshing(let items):
+                contentCarousel(for: items)
+                    .overlay(alignment: .topTrailing) { refreshingIndicator }
+            case .loaded(let items):
+                contentCarousel(for: items)
+            case .empty:
+                SectionPlaceholderView(message: emptyMessage)
+            case .error(let error):
+                SectionPlaceholderView(message: error.message)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.easeInOut(duration: 0.3), value: state.status)
+        .animation(.easeInOut(duration: 0.3), value: stateDisplayKey)
+    }
+
+    private var placeholderCarousel: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 16) {
+                ForEach(0..<placeholderCount, id: \.self) { _ in
+                    placeholderBuilder()
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func contentCarousel(for items: [Item]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 16) {
+                ForEach(items) { item in
+                    contentBuilder(item)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .transition(.opacity)
+    }
+
+    private var refreshingIndicator: some View {
+        ProgressView()
+            .padding(8)
+            .background(.thinMaterial, in: Capsule())
+            .padding(.trailing, 8)
+            .padding(.top, 4)
+    }
+
+    private var stateDisplayKey: Int {
+        switch state {
+        case .idle: return 0
+        case .loading: return 1
+        case .refreshing: return 2
+        case .loaded: return 3
+        case .empty: return 4
+        case .error: return 5
+        }
     }
 }

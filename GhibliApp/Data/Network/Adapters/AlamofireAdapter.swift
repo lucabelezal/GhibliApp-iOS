@@ -54,6 +54,4 @@ public actor AlamofireAdapter: HTTPClient {
 			throw error
 		}
 	}
-
-	// logging handled via injected `HTTPLogger` (DEBUG only)
 }

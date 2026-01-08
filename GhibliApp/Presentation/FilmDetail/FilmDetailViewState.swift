@@ -1,10 +1,15 @@
 import Foundation
 
-struct SectionState<Item> {
-    var status: ViewStatus = .idle
-    var items: [Item] = []
+struct FilmDetailViewContent: Equatable, Sendable {
+    var isFavorite: Bool
 }
 
-struct FilmDetailViewState {
-    var isFavorite: Bool = false
+extension FilmDetailViewContent {
+    static var notFavorite: FilmDetailViewContent {
+        FilmDetailViewContent(isFavorite: false)
+    }
+
+    func updatingFavorite(_ newValue: Bool) -> FilmDetailViewContent {
+        FilmDetailViewContent(isFavorite: newValue)
+    }
 }

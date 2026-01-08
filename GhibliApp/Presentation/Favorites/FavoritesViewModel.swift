@@ -1,15 +1,13 @@
+import Combine
 import Foundation
-import Observation
 
-@Observable
 @MainActor
-final class FavoritesViewModel {
-    var state = FavoritesViewState()
+final class FavoritesViewModel: ObservableObject {
+    @Published private(set) var state: ViewState<FavoritesViewContent> = .idle
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
-    private var favoriteIDs: Set<String> = []
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,
@@ -22,44 +20,53 @@ final class FavoritesViewModel {
     }
 
     func load() async {
-        guard state.status != .loading else { return }
-        await MainActor.run { state.status = .loading }
-
-        let fetch = fetchFilmsUseCase
-        let getFav = getFavoritesUseCase
-
-        do {
-            let (films, favorites) = try await Task.detached { () -> ([Film], Set<String>) in
-                async let filmsTask = fetch.execute()
-                async let favoritesTask = getFav.execute()
-                return try await (filmsTask, favoritesTask)
-            }.value
-
-            let favoriteFilms = films.filter { favorites.contains($0.id) }
-            favoriteIDs = favorites
-            await MainActor.run {
-                state.films = favoriteFilms
-                state.status = favoriteFilms.isEmpty ? .empty : .loaded
-            }
-        } catch {
-            await MainActor.run { state.status = .error(error.localizedDescription) }
-        }
+        guard canStartLoading else { return }
+        state = .loading
+        await fetchFavorites()
     }
 
     func toggle(_ film: Film) async {
-        let toggle = toggleFavoriteUseCase
         do {
-            let filmId = film.id
-            let favorites = try await Task.detached { () -> Set<String> in
-                try await toggle.execute(id: filmId)
-            }.value
-            favoriteIDs = favorites
-            await MainActor.run {
-                state.films = state.films.filter { favoriteIDs.contains($0.id) }
-                state.status = state.films.isEmpty ? .empty : .loaded
-            }
+            let favorites = try await toggleFavoriteUseCase.execute(id: film.id)
+            applyFavoritesFilter(favorites)
         } catch {
-            await MainActor.run { state.status = .error(error.localizedDescription) }
+            state = .error(.from(error))
         }
+    }
+
+    private func fetchFavorites() async {
+        do {
+            async let filmsTask = fetchFilmsUseCase.execute()
+            async let favoritesTask = getFavoritesUseCase.execute()
+            let films = try await filmsTask
+            let favorites = try await favoritesTask
+            let favoriteFilms = films.filter { favorites.contains($0.id) }
+            updateState(with: favoriteFilms)
+        } catch {
+            state = .error(.from(error))
+        }
+    }
+
+    private func applyFavoritesFilter(_ favorites: Set<String>) {
+        guard let content = currentContent else { return }
+        let updatedFilms = content.films.filter { favorites.contains($0.id) }
+        updateState(with: updatedFilms)
+    }
+
+    private func updateState(with films: [Film]) {
+        let content = FavoritesViewContent(films: films)
+        state = content.isEmpty ? .empty : .loaded(content)
+    }
+
+    private var currentContent: FavoritesViewContent? {
+        if case .loaded(let content) = state { return content }
+        if case .refreshing(let content) = state { return content }
+        return nil
+    }
+
+    private var canStartLoading: Bool {
+        if case .loading = state { return false }
+        if case .refreshing = state { return false }
+        return true
     }
 }

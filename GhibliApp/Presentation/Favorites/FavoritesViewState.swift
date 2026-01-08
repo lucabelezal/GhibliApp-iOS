@@ -1,6 +1,13 @@
 import Foundation
 
-struct FavoritesViewState {
-    var status: ViewStatus = .idle
-    var films: [Film] = []
+struct FavoritesViewContent: Equatable, Sendable {
+    var films: [Film]
+
+    var isEmpty: Bool { films.isEmpty }
+}
+
+extension FavoritesViewContent {
+    static var empty: FavoritesViewContent {
+        FavoritesViewContent(films: [])
+    }
 }
