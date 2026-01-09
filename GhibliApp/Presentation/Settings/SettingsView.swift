@@ -15,6 +15,27 @@ struct SettingsView: View {
     @AppStorage(UserDefaultsKeys.notificationsEnabled)
     private var notificationsEnabled: Bool = true
 
+    private var resetBinding: Binding<Bool> {
+        Binding(
+            get: {
+                switch viewModel.state {
+                case .refreshing(let content):
+                    return content.isShowingResetConfirmation
+                case .loaded(let content):
+                    return content.isShowingResetConfirmation
+                default:
+                    return false
+                }
+            },
+            set: { newValue in
+                if newValue {
+                    viewModel.presentReset()
+                } else {
+                    viewModel.dismissReset()
+                }
+            })
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             AppBackground()
@@ -23,6 +44,18 @@ struct SettingsView: View {
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle("Ajustes")
         .setAppearanceTheme()
+        .alert(isPresented: resetBinding) {
+            Alert(
+                title: Text("Limpar cache?"),
+                message: Text("Isso removerá os dados offline e favoritos salvos no dispositivo."),
+                primaryButton: .destructive(Text("Limpar")) {
+                    Task { await viewModel.resetCache() }
+                },
+                secondaryButton: .cancel(Text("Cancelar")) {
+                    viewModel.dismissReset()
+                }
+            )
+        }
     }
 
     @ViewBuilder
@@ -47,11 +80,14 @@ struct SettingsView: View {
                     }
                 }
         case .empty:
-            EmptyStateView(title: "Nada para configurar", subtitle: "Volte mais tarde", fullScreen: true)
+            EmptyStateView(
+                title: "Nada para configurar", subtitle: "Volte mais tarde", fullScreen: true)
         case .error(let error):
-            ErrorView(message: error.message, retryTitle: "Tentar novamente", retry: {
-                viewModel.dismissNotification()
-            }, fullScreen: true)
+            ErrorView(
+                message: error.message, retryTitle: "Tentar novamente",
+                retry: {
+                    viewModel.dismissNotification()
+                }, fullScreen: true)
         }
     }
 
@@ -59,12 +95,6 @@ struct SettingsView: View {
         form
             .overlay(alignment: .bottom) {
                 messageBanner(for: content.notification)
-            }
-            .overlay {
-                if content.isShowingResetConfirmation {
-                    resetDialog(for: content)
-                        .transition(.scale.combined(with: .opacity))
-                }
             }
     }
 
@@ -111,29 +141,6 @@ struct SettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
-    }
-
-    private func resetDialog(for content: SettingsViewContent) -> some View {
-        VStack(spacing: 24) {
-            Text("Limpar cache?")
-                .font(.headline)
-            Text("Isso removerá os dados offline e favoritos salvos no dispositivo.")
-                .font(.subheadline)
-                .multilineTextAlignment(.center)
-            HStack {
-                Button("Cancelar") { viewModel.dismissReset() }
-                    .buttonStyle(.bordered)
-                Button("Limpar", role: .destructive) {
-                    Task { await viewModel.resetCache() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(content.isResettingCache)
-            }
-        }
-        .padding(.vertical, 24)
-        .glassBackground()
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
     }
 
     @ViewBuilder
