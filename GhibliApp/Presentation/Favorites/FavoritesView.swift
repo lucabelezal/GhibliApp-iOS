@@ -30,11 +30,11 @@ struct FavoritesView: View {
             list(for: content)
         case .empty:
             EmptyStateView(
-                title: "Sem favoritos", subtitle: "Adicione filmes aos favoritos para vê-los aqui")
+                title: "Sem favoritos", subtitle: "Adicione filmes aos favoritos para vê-los aqui", fullScreen: true)
         case .error(let error):
-            ErrorView(message: error.message, retryTitle: "Recarregar") {
+            ErrorView(message: error.message, retryTitle: "Recarregar", retry: {
                 Task { await viewModel.load() }
-            }
+            }, fullScreen: true)
         }
     }
 

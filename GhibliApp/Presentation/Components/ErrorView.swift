@@ -4,9 +4,10 @@ struct ErrorView: View {
     let message: String
     let retryTitle: String
     var retry: (() -> Void)?
+    var fullScreen: Bool = false
 
     var body: some View {
-        VStack(spacing: 16) {
+        let content = VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.largeTitle)
                 .foregroundStyle(.orange)
@@ -18,7 +19,16 @@ struct ErrorView: View {
                     .buttonStyle(.borderedProminent)
             }
         }
-        .padding()
-        .glassBackground()
+
+        if fullScreen {
+            content
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+        } else {
+            content
+                .padding()
+                .glassBackground()
+        }
     }
 }

@@ -47,12 +47,11 @@ struct SettingsView: View {
                     }
                 }
         case .empty:
-            EmptyStateView(title: "Nada para configurar", subtitle: "Volte mais tarde")
+            EmptyStateView(title: "Nada para configurar", subtitle: "Volte mais tarde", fullScreen: true)
         case .error(let error):
-            ErrorView(message: error.message, retryTitle: "Tentar novamente") {
+            ErrorView(message: error.message, retryTitle: "Tentar novamente", retry: {
                 viewModel.dismissNotification()
-            }
-            .padding(.horizontal)
+            }, fullScreen: true)
         }
     }
 
@@ -115,7 +114,7 @@ struct SettingsView: View {
     }
 
     private func resetDialog(for content: SettingsViewContent) -> some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Text("Limpar cache?")
                 .font(.headline)
             Text("Isso removerá os dados offline e favoritos salvos no dispositivo.")

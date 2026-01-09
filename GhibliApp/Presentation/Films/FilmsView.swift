@@ -37,16 +37,15 @@ struct FilmsView: View {
                 filmsList(for: content)
             case .empty:
                 EmptyStateView(
-                    title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde"
+                    title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde", fullScreen: true
                 )
                 .padding(.top, 24)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             case .error(let error):
-                ErrorView(message: error.message, retryTitle: "Tentar novamente") {
+                ErrorView(message: error.message, retryTitle: "Tentar novamente", retry: {
                     Task { await viewModel.load(forceRefresh: true) }
-                }
-                .padding(.top, 24)
+                }, fullScreen: true)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             }

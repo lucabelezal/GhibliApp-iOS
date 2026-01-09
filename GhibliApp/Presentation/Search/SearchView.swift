@@ -24,7 +24,7 @@ struct SearchView: View {
         switch viewModel.state {
         case .idle:
             EmptyStateView(
-                title: "Busque filmes", subtitle: "Digite o nome do filme para começar")
+                title: "Busque filmes", subtitle: "Digite o nome do filme para começar", fullScreen: true)
         case .loading:
             LoadingView()
         case .refreshing(let content):
@@ -33,14 +33,14 @@ struct SearchView: View {
         case .loaded(let content):
             results(for: content)
         case .empty:
-            EmptyStateView(title: "Nada encontrado", subtitle: "Tente outro termo")
+            EmptyStateView(title: "Nada encontrado", subtitle: "Tente outro termo", fullScreen: true)
         case .error(let error):
             if error.style == .offline {
                 offlineView
             } else {
-                ErrorView(message: error.message, retryTitle: "Tentar novamente") {
+                ErrorView(message: error.message, retryTitle: "Tentar novamente", retry: {
                     viewModel.updateQuery(viewModel.query)
-                }
+                }, fullScreen: true)
             }
         }
     }
