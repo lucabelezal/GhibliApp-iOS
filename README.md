@@ -160,26 +160,20 @@ Sinta-se a vontade para abrir issues ou PRs com melhorias, especialmente em torn
 
 ## Documentação e capturas
 
-Há uma pasta de apoio com recursos visuais em `DOCS/Resources/` contendo prints do app que ajudam no onboarding e revisão de UI. Arquivos atuais:
+Há uma pasta de apoio com recursos visuais em `GhibliApp/Docs/Screenshots/` contendo prints do app que ajudam no onboarding e revisão de UI. Arquivos atuais:
 
-- `DOCS/Resources/loadingFilms.png` — estado de carregamento
-- `DOCS/Resources/films.png` — lista de filmes
-- `DOCS/Resources/filmDetail.png` — tela de detalhe do filme
-- `DOCS/Resources/favorites.png` — tela de favoritos
-- `DOCS/Resources/settings.png` — configuracoes
-- `DOCS/Resources/search.png` — busca
+- `GhibliApp/Docs/Screenshots/loadingFilms.png` — estado de carregamento
+- `GhibliApp/Docs/Screenshots/films.png` — lista de filmes
+- `GhibliApp/Docs/Screenshots/filmDetail.png` — tela de detalhe do filme
+- `GhibliApp/Docs/Screenshots/favorites.png` — tela de favoritos
+- `GhibliApp/Docs/Screenshots/settings.png` — configuracoes
+- `GhibliApp/Docs/Screenshots/search.png` — busca
 
-Sinta-se à vontade para renomear ou reorganizar esses arquivos; se preferir, eu posso mover/renomear para `DOCS/screenshots/` e ajustar o README automaticamente.
+Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as imagens para `GhibliApp/Docs/Screenshots/` e atualizei os links abaixo para caminhos relativos dentro do repositório.
 
 ### Sequência visual (fluxo de uso)
 Abaixo a sequência das telas principais — carregamento → lista → detalhe → favoritos → busca → configurações.
 
-| Carregando | Lista | Detalhe |
-|---:|:---:|:---:|
-| ![Loading](GhibliApp/DOCS/Resources/loadingFilms.png) | ![Films](GhibliApp/DOCS/Resources/films.png) | ![Film Detail](GhibliApp/DOCS/Resources/filmDetail.png) |
+![Loading](GhibliApp/Docs/Screenshots/loadingFilms.png) ➡️ ![Films](GhibliApp/Docs/Screenshots/films.png) ➡️ ![Film Detail](GhibliApp/Docs/Screenshots/filmDetail.png) ➡️ ![Favorites](GhibliApp/Docs/Screenshots/favorites.png) ➡️ ![Search](GhibliApp/Docs/Screenshots/search.png) ➡️ ![Settings](GhibliApp/Docs/Screenshots/settings.png)
 
-| Favoritos | Busca | Configurações |
-|---:|:---:|:---:|
-| ![Favorites](GhibliApp/DOCS/Resources/favorites.png) | ![Search](GhibliApp/DOCS/Resources/search.png) | ![Settings](GhibliApp/DOCS/Resources/settings.png) |
-
-Obs: se as imagens continuarem não aparecendo no preview, pode ser necessário mover `DOCS/Resources/` para `DOCS/screenshots/` (caminho mais comum). Posso fazer isso automaticamente se quiser.
+Os caminhos foram atualizados para `GhibliApp/Docs/Screenshots/<nome>.png` (case-sensitive). Se preferir outro padrão de nomecnclatura, me diga e eu ajusto.
