@@ -174,6 +174,6 @@ Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as 
 ### Sequência visual (fluxo de uso)
 Abaixo a sequência das telas principais — carregamento → lista → detalhe → favoritos → busca → configurações.
 
-![Loading](GhibliApp/Docs/Screenshots/loadingFilms.png) ➡️ ![Films](GhibliApp/Docs/Screenshots/films.png) ➡️ ![Film Detail](GhibliApp/Docs/Screenshots/filmDetail.png) ➡️ ![Favorites](GhibliApp/Docs/Screenshots/favorites.png) ➡️ ![Search](GhibliApp/Docs/Screenshots/search.png) ➡️ ![Settings](GhibliApp/Docs/Screenshots/settings.png)
+<img src="GhibliApp/Docs/Screenshots/loadingFilms.png" alt="Loading" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/films.png" alt="Films" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/filmDetail.png" alt="Film Detail" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/favorites.png" alt="Favorites" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/>
 
 Os caminhos foram atualizados para `GhibliApp/Docs/Screenshots/<nome>.png` (case-sensitive). Se preferir outro padrão de nomecnclatura, me diga e eu ajusto.
