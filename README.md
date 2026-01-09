@@ -172,18 +172,14 @@ Há uma pasta de apoio com recursos visuais em `DOCS/Resources/` contendo prints
 Sinta-se à vontade para renomear ou reorganizar esses arquivos; se preferir, eu posso mover/renomear para `DOCS/screenshots/` e ajustar o README automaticamente.
 
 ### Sequência visual (fluxo de uso)
-Abaixo uma sequência com as principais telas — carregamento → lista → detalhe → favoritos → busca → configurações.
+Abaixo a sequência das telas principais — carregamento → lista → detalhe → favoritos → busca → configurações.
 
-<p align="center">
-  <img src="GhibliApp/DOCS/Resources/loadingFilms.png" alt="Loading" width="180" />
-  <span style="font-size:32px; margin: 0 12px;">➡️</span>
-  <img src="GhibliApp/DOCS/Resources/films.png" alt="Films" width="180" />
-  <span style="font-size:32px; margin: 0 12px;">➡️</span>
-  <img src="GhibliApp/DOCS/Resources/filmDetail.png" alt="Film Detail" width="180" />
-  <span style="font-size:32px; margin: 0 12px;">➡️</span>
-  <img src="GhibliApp/DOCS/Resources/favorites.png" alt="Favorites" width="180" />
-  <span style="font-size:32px; margin: 0 12px;">➡️</span>
-  <img src="GhibliApp/DOCS/Resources/search.png" alt="Search" width="180" />
-  <span style="font-size:32px; margin: 0 12px;">➡️</span>
-  <img src="GhibliApp/DOCS/Resources/settings.png" alt="Settings" width="180" />
-</p>
+| Carregando | Lista | Detalhe |
+|---:|:---:|:---:|
+| ![Loading](GhibliApp/DOCS/Resources/loadingFilms.png) | ![Films](GhibliApp/DOCS/Resources/films.png) | ![Film Detail](GhibliApp/DOCS/Resources/filmDetail.png) |
+
+| Favoritos | Busca | Configurações |
+|---:|:---:|:---:|
+| ![Favorites](GhibliApp/DOCS/Resources/favorites.png) | ![Search](GhibliApp/DOCS/Resources/search.png) | ![Settings](GhibliApp/DOCS/Resources/settings.png) |
+
+Obs: se as imagens continuarem não aparecendo no preview, pode ser necessário mover `DOCS/Resources/` para `DOCS/screenshots/` (caminho mais comum). Posso fazer isso automaticamente se quiser.
