@@ -157,3 +157,16 @@ UI → ViewModel → UseCase → Repository
 - Testes adicionais podem ser introduzidos futuramente para `PendingChangeStore`, `FavoritesRepository` e casos de uso criticos, conforme evolucao do sync.
 
 Sinta-se a vontade para abrir issues ou PRs com melhorias, especialmente em torno da estrategia de sincronizacao e cobertura de testes.
+
+## Documentação e capturas
+
+Há uma pasta de apoio com recursos visuais em `DOCS/Resources/` contendo prints do app que ajudam no onboarding e revisão de UI. Arquivos atuais:
+
+- `DOCS/Resources/loadingFilms.png` — estado de carregamento
+- `DOCS/Resources/films.png` — lista de filmes
+- `DOCS/Resources/filmDetail.png` — tela de detalhe do filme
+- `DOCS/Resources/favorites.png` — tela de favoritos
+- `DOCS/Resources/settings.png` — configuracoes
+- `DOCS/Resources/search.png` — busca
+
+Sinta-se à vontade para renomear ou reorganizar esses arquivos; se preferir, eu posso mover/renomear para `DOCS/screenshots/` e ajustar o README automaticamente.
