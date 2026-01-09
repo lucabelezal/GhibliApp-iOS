@@ -12,13 +12,10 @@ final class CachedPayload {
     }
 }
 
-    actor SwiftDataAdapter: StorageAdapter {
-        static let shared = SwiftDataAdapter()
+final class SwiftDataAdapter: StorageAdapter, @unchecked Sendable {
+    static let shared = SwiftDataAdapter()
 
     private let container: ModelContainer
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
-
     private init() {
         do {
             container = try ModelContainer(for: CachedPayload.self)
@@ -27,31 +24,39 @@ final class CachedPayload {
         }
     }
 
+    @MainActor
     private var context: ModelContext { ModelContext(container) }
 
     func save<T: Codable & Sendable>(_ value: T, for key: String) async throws {
-        let payload = try encoder.encode(value)
-        let ctx = context
-        if let existing = fetchPayload(for: key, in: ctx) {
-            existing.data = payload
-        } else {
-            ctx.insert(CachedPayload(key: key, data: payload))
+        let payload = try JSONEncoder().encode(value)
+        await MainActor.run {
+            let ctx = self.context
+            if let existing = fetchPayload(for: key, in: ctx) {
+                existing.data = payload
+            } else {
+                ctx.insert(CachedPayload(key: key, data: payload))
+            }
+            try? ctx.save()
         }
-        try ctx.save()
     }
 
     func load<T: Codable & Sendable>(_ type: T.Type, for key: String) async throws -> T? {
-        let ctx = context
-        guard let payload = fetchPayload(for: key, in: ctx) else { return nil }
-        return try decoder.decode(T.self, from: payload.data)
+        return try await MainActor.run {
+            let ctx = self.context
+            guard let payload = fetchPayload(for: key, in: ctx) else { return nil }
+            return try JSONDecoder().decode(T.self, from: payload.data)
+        }
     }
 
     func clearAll() async throws {
-        let ctx = context
-        let descriptor = FetchDescriptor<CachedPayload>()
-        let items = try ctx.fetch(descriptor)
-        items.forEach { ctx.delete($0) }
-        try ctx.save()
+        await MainActor.run {
+            let ctx = self.context
+            let descriptor = FetchDescriptor<CachedPayload>()
+            if let items = try? ctx.fetch(descriptor) {
+                items.forEach { ctx.delete($0) }
+                try? ctx.save()
+            }
+        }
     }
 
     private func fetchPayload(for key: String, in context: ModelContext) -> CachedPayload? {

@@ -15,6 +15,7 @@ final class AppContainer {
     private let clearFavoritesUseCase: ClearFavoritesUseCase
     private let clearCacheUseCase: ClearCacheUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
+    private let syncManager: SyncManager
 
     private init() {
         let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
@@ -24,14 +25,38 @@ final class AppContainer {
             let httpLogger: HTTPLogger? = nil
         #endif
 
-        let httpClient = URLSessionAdapter(baseURL: apiBaseURL, logger: httpLogger)
-        
-           // Adapter Pattern: Você pode trocar entre SwiftDataAdapter e UserDefaultsAdapter
-           // sem alterar nenhum Repository, pois ambos implementam StorageAdapter protocol
-           let storage: StorageAdapter = SwiftDataAdapter.shared
-           // Alternativa: let storage: StorageAdapter = UserDefaultsAdapter()
-        
-          let filmRepository: FilmRepositoryProtocol = FilmRepository(
+          let httpClient = URLSessionAdapter(baseURL: apiBaseURL, logger: httpLogger)
+
+              // Padrão Adapter: é possível alternar entre SwiftDataAdapter e UserDefaultsAdapter
+              // sem tocar nos Repositories, pois ambos implementam o protocolo StorageAdapter.
+              let storage: StorageAdapter = SwiftDataAdapter.shared
+              // Alternativa: let storage: StorageAdapter = UserDefaultsAdapter()
+
+              let pendingStore = PendingChangeStore(storage: storage)
+              let connectivityRepository: ConnectivityRepositoryProtocol = ConnectivityMonitor()
+
+              // Feature flag centralizada controla a ativação da sincronização.
+              // Padrão: desabilitado (Noop). O mock só é permitido em DEBUG quando o flag estiver ativo.
+              let syncStrategy: PendingChangeSyncStrategy
+              if FeatureFlags.syncEnabled {
+                  #if DEBUG
+                  syncStrategy = MockPendingChangeSyncStrategy(behavior: .success, delaySeconds: 0)
+                  #else
+                  // Em builds não-DEBUG mantemos Noop, mesmo que o flag seja ativado por engano.
+                  syncStrategy = NoopPendingChangeSyncStrategy()
+                  #endif
+              } else {
+                  syncStrategy = NoopPendingChangeSyncStrategy()
+              }
+
+              let syncManager = SyncManager(
+                  connectivity: connectivityRepository,
+                  pendingStore: pendingStore,
+                  strategy: syncStrategy
+              )
+              self.syncManager = syncManager
+
+             let filmRepository: FilmRepositoryProtocol = FilmRepository(
               client: httpClient, cache: storage)
           let peopleRepository: PeopleRepositoryProtocol = PeopleRepository(
             client: httpClient,
@@ -44,10 +69,8 @@ final class AppContainer {
           let vehiclesRepository: VehiclesRepositoryProtocol = VehiclesRepository(
               client: httpClient, cache: storage)
           let favoritesRepository: FavoritesRepositoryProtocol = FavoritesRepository(
-              storage: storage)
+              storage: storage, pendingStore: pendingStore)
           let cacheRepository: CacheRepositoryProtocol = CacheRepository(storage: storage)
-        let connectivityRepository: ConnectivityRepositoryProtocol = ConnectivityMonitor()
-
         self.fetchFilmsUseCase = FetchFilmsUseCase(repository: filmRepository)
         self.fetchPeopleUseCase = FetchPeopleUseCase(repository: peopleRepository)
         self.fetchLocationsUseCase = FetchLocationsUseCase(repository: locationsRepository)
@@ -61,6 +84,8 @@ final class AppContainer {
             repository: connectivityRepository)
 
         self.router = AppRouter()
+
+        Task { await syncManager.start() }
     }
 
     func makeFilmsViewModel() -> FilmsViewModel {
