@@ -54,9 +54,7 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
-        .tabViewBottomAccessory {
-            EmptyView()
-        }
+        .toolbarBackground(.hidden, for: .tabBar)
     }
 
     private func navigationStack<Content: View>(
