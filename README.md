@@ -170,3 +170,20 @@ Há uma pasta de apoio com recursos visuais em `DOCS/Resources/` contendo prints
 - `DOCS/Resources/search.png` — busca
 
 Sinta-se à vontade para renomear ou reorganizar esses arquivos; se preferir, eu posso mover/renomear para `DOCS/screenshots/` e ajustar o README automaticamente.
+
+### Sequência visual (fluxo de uso)
+Abaixo uma sequência com as principais telas — carregamento → lista → detalhe → favoritos → busca → configurações.
+
+<p align="center">
+  <img src="GhibliApp/DOCS/Resources/loadingFilms.png" alt="Loading" width="180" />
+  <span style="font-size:32px; margin: 0 12px;">➡️</span>
+  <img src="GhibliApp/DOCS/Resources/films.png" alt="Films" width="180" />
+  <span style="font-size:32px; margin: 0 12px;">➡️</span>
+  <img src="GhibliApp/DOCS/Resources/filmDetail.png" alt="Film Detail" width="180" />
+  <span style="font-size:32px; margin: 0 12px;">➡️</span>
+  <img src="GhibliApp/DOCS/Resources/favorites.png" alt="Favorites" width="180" />
+  <span style="font-size:32px; margin: 0 12px;">➡️</span>
+  <img src="GhibliApp/DOCS/Resources/search.png" alt="Search" width="180" />
+  <span style="font-size:32px; margin: 0 12px;">➡️</span>
+  <img src="GhibliApp/DOCS/Resources/settings.png" alt="Settings" width="180" />
+</p>
