@@ -19,29 +19,33 @@ final class AppContainer {
     private init() {
         let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
         #if DEBUG
-            let httpLogger: HTTPLogger? = DefaultHTTPLogger()
+            let httpLogger: HTTPLogger? = ConsoleHTTPLogger()
         #else
             let httpLogger: HTTPLogger? = nil
         #endif
 
         let httpClient = URLSessionAdapter(baseURL: apiBaseURL, logger: httpLogger)
-        let cacheStore = SwiftDataCacheStore.shared
-        let filmRepository: FilmRepositoryProtocol = RemoteFilmRepository(
-            client: httpClient, cache: cacheStore)
-        let peopleRepository: PeopleRepositoryProtocol = RemotePeopleRepository(
+        
+           // Adapter Pattern: Você pode trocar entre SwiftDataAdapter e UserDefaultsAdapter
+           // sem alterar nenhum Repository, pois ambos implementam StorageAdapter protocol
+           let storage: StorageAdapter = SwiftDataAdapter.shared
+           // Alternativa: let storage: StorageAdapter = UserDefaultsAdapter()
+        
+          let filmRepository: FilmRepositoryProtocol = FilmRepository(
+              client: httpClient, cache: storage)
+          let peopleRepository: PeopleRepositoryProtocol = PeopleRepository(
             client: httpClient,
             baseURL: apiBaseURL,
-            cache: cacheStore)
-        let locationsRepository: LocationsRepositoryProtocol = RemoteLocationsRepository(
-            client: httpClient, cache: cacheStore)
-        let speciesRepository: SpeciesRepositoryProtocol = RemoteSpeciesRepository(
-            client: httpClient, cache: cacheStore)
-        let vehiclesRepository: VehiclesRepositoryProtocol = RemoteVehiclesRepository(
-            client: httpClient, cache: cacheStore)
-        let favoritesStore: FavoritesStoreProtocol = SwiftDataFavoritesStore()
-        let favoritesRepository: FavoritesRepositoryProtocol = FavoritesRepositoryStore(
-            store: favoritesStore)
-        let cacheRepository: CacheRepositoryProtocol = CacheRepositoryStore(cache: cacheStore)
+              cache: storage)
+          let locationsRepository: LocationsRepositoryProtocol = LocationsRepository(
+              client: httpClient, cache: storage)
+          let speciesRepository: SpeciesRepositoryProtocol = SpeciesRepository(
+              client: httpClient, cache: storage)
+          let vehiclesRepository: VehiclesRepositoryProtocol = VehiclesRepository(
+              client: httpClient, cache: storage)
+          let favoritesRepository: FavoritesRepositoryProtocol = FavoritesRepository(
+              storage: storage)
+          let cacheRepository: CacheRepositoryProtocol = CacheRepository(storage: storage)
         let connectivityRepository: ConnectivityRepositoryProtocol = ConnectivityMonitor()
 
         self.fetchFilmsUseCase = FetchFilmsUseCase(repository: filmRepository)

@@ -5,7 +5,7 @@ public protocol NetworkReachability: Sendable {
 	func isReachable() async -> Bool
 }
 
-public actor NetworkReachabilityManagerAdapter: NetworkReachability {
+public actor NetworkReachabilityAdapter: NetworkReachability {
 	private let monitor: NWPathMonitor
 	private let queue: DispatchQueue
 	private var status: NWPath.Status

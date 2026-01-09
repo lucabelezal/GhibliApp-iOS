@@ -1,13 +1,13 @@
 import Combine
 import Foundation
 
+@MainActor
 final class FilmDetailSectionViewModel<Item>: ObservableObject {
     private let film: Film
     private let loader: (_ film: Film, _ forceRefresh: Bool) async throws -> [Item]
 
     @Published private(set) var state: ViewState<[Item]> = .idle
 
-    @MainActor
     init(
         film: Film,
         loader: @escaping (_ film: Film, _ forceRefresh: Bool) async throws -> [Item]
@@ -16,7 +16,6 @@ final class FilmDetailSectionViewModel<Item>: ObservableObject {
         self.loader = loader
     }
 
-    @MainActor
     func load(forceRefresh: Bool = false) async {
         guard canLoad(forceRefresh: forceRefresh) else { return }
         if forceRefresh, let currentItems {
@@ -33,7 +32,6 @@ final class FilmDetailSectionViewModel<Item>: ObservableObject {
         }
     }
 
-    @MainActor
     private var currentItems: [Item]? {
         switch state {
         case .loaded(let items), .refreshing(let items):
@@ -43,7 +41,6 @@ final class FilmDetailSectionViewModel<Item>: ObservableObject {
         }
     }
 
-    @MainActor
     private func canLoad(forceRefresh: Bool) -> Bool {
         switch state {
         case .loading, .refreshing:
@@ -57,17 +54,14 @@ final class FilmDetailSectionViewModel<Item>: ObservableObject {
         }
     }
 
-    @MainActor
     private func applyLoadedItems(_ items: [Item]) {
         state = items.isEmpty ? .empty : .loaded(items)
     }
 
-    @MainActor
     public func setItems(_ items: [Item]) {
         applyLoadedItems(items)
     }
 
-    @MainActor
     public func setError(_ error: Error) {
         state = .error(.from(error))
     }

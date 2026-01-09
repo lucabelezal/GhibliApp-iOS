@@ -13,7 +13,7 @@ public actor URLSessionAdapter: HTTPClient {
         baseURLQueryItems: [URLQueryItem]? = nil,
         session: URLSession = .shared,
         timeoutInterval: TimeInterval = 30,
-        requestFactory: EndpointRequestFactory & Sendable = DefaultEndpointRequestFactory(),
+        requestFactory: EndpointRequestFactory & Sendable = StandardEndpointRequestFactory(),
         logger: HTTPLogger? = nil,
     ) {
         self.session = session

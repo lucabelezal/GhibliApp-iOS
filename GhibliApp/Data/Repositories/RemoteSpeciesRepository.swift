@@ -1,25 +1,4 @@
 import Foundation
 
-struct RemoteSpeciesRepository: SpeciesRepositoryProtocol {
-    private let client: any HTTPClient & Sendable
-    private let cache: SwiftDataCacheStore
-
-    init(client: some HTTPClient & Sendable, cache: SwiftDataCacheStore = .shared) {
-        self.client = client
-        self.cache = cache
-    }
-
-    func fetchSpecies(for film: Film, forceRefresh: Bool) async throws -> [Species] {
-        let cacheKey = "species.\(film.id)"
-        if !forceRefresh,
-            let cached: [SpeciesDTO] = try await cache.load([SpeciesDTO].self, for: cacheKey)
-        {
-            return cached.map(SpeciesMapper.map)
-        }
-
-        let dtos: [SpeciesDTO] = try await client.request(with: GhibliEndpoint.species)
-        let filtered = dtos.filter { $0.belongs(to: film.id) }
-        try await cache.save(filtered, for: cacheKey)
-        return filtered.map(SpeciesMapper.map)
-    }
-}
+@available(*, deprecated, message: "Use SpeciesRepository instead")
+typealias RemoteSpeciesRepository = SpeciesRepository

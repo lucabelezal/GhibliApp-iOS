@@ -9,7 +9,7 @@ public protocol EndpointRequestFactory: Sendable {
     ) throws -> URLRequest
 }
 
-public struct DefaultEndpointRequestFactory: EndpointRequestFactory {
+public struct StandardEndpointRequestFactory: EndpointRequestFactory {
     public init() {}
 
     public func makeRequest(

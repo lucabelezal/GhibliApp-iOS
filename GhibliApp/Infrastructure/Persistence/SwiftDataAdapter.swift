@@ -12,8 +12,8 @@ final class CachedPayload {
     }
 }
 
-actor SwiftDataCacheStore {
-    static let shared = SwiftDataCacheStore()
+    actor SwiftDataAdapter: StorageAdapter {
+        static let shared = SwiftDataAdapter()
 
     private let container: ModelContainer
     private let encoder = JSONEncoder()

@@ -14,7 +14,7 @@ public actor AlamofireAdapter: HTTPClient {
 		baseQueryItems: [URLQueryItem] = [],
 		timeoutInterval: TimeInterval = 30,
 		session: Session = .default,
-		requestFactory: EndpointRequestFactory = DefaultEndpointRequestFactory(),
+		requestFactory: EndpointRequestFactory = StandardEndpointRequestFactory(),
 		logger: HTTPLogger? = nil
 	) {
 		self.session = session
