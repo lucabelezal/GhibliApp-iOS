@@ -195,8 +195,6 @@ func useWrapper(_ w: NonSendableWrapper) async {
 ```
 
 ## Exemplos do Projeto
-
-## Exemplos do Projeto
 - Refatoração de `Task.detached` para `async let` em requests paralelos na tela de detalhes do filme.
 - Uso consistente de `@MainActor` em ViewModels.
 
