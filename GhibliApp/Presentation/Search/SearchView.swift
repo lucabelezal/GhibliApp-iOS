@@ -7,7 +7,7 @@ struct SearchView: View {
     var body: some View {
         ZStack {
             AppBackground()
-            content
+            bodyContent
         }
         .navigationTitle("Buscar")
         .searchable(
@@ -18,41 +18,47 @@ struct SearchView: View {
             prompt: "Busque filmes"
         )
     }
+}
 
+// MARK: - Fillings
+private extension SearchView {
     @ViewBuilder
-    private var content: some View {
+    var bodyContent: some View {
         switch viewModel.state {
         case .idle:
             EmptyStateView(
-                title: "Busque filmes", subtitle: "Digite o nome do filme para começar", fullScreen: true)
+                title: "Busque filmes",
+                subtitle: "Digite o nome do filme para começar",
+                fullScreen: true
+            )
         case .loading:
             LoadingView()
         case .refreshing(let content):
-            results(for: content)
+            resultsList(for: content)
                 .overlay(alignment: .top) { progressOverlay }
         case .loaded(let content):
-            results(for: content)
+            resultsList(for: content)
         case .empty:
-            EmptyStateView(title: "Nada encontrado", subtitle: "Tente outro termo", fullScreen: true)
+            EmptyStateView(
+                title: "Nada encontrado",
+                subtitle: "Tente outro termo",
+                fullScreen: true
+            )
         case .error(let error):
             if error.style == .offline {
                 offlineView
             } else {
-                ErrorView(message: error.message, retryTitle: "Tentar novamente", retry: {
-                    viewModel.updateQuery(viewModel.query)
-                }, fullScreen: true)
+                ErrorView(
+                    message: error.message,
+                    retryTitle: "Tentar novamente",
+                    retry: { viewModel.updateQuery(viewModel.query) },
+                    fullScreen: true
+                )
             }
         }
     }
 
-    private var progressOverlay: some View {
-        ProgressView()
-            .padding()
-            .background(.thinMaterial, in: Capsule())
-            .padding(.top, 8)
-    }
-
-    private func results(for content: SearchViewContent) -> some View {
+    private func resultsList(for content: SearchViewContent) -> some View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(content.results, id: \.id) { film in
@@ -65,10 +71,9 @@ struct SearchView: View {
                                 isFavorite: content.isFavorite(film),
                                 onToggleFavorite: { Task { await viewModel.toggleFavorite(film) } }
                             )
-                            .padding(.vertical, 12)
+                            .filmRowStyle()
                         }
                         .buttonStyle(.plain)
-
                         Divider()
                     }
                 }
@@ -77,7 +82,14 @@ struct SearchView: View {
         }
     }
 
-    private var offlineView: some View {
+    var progressOverlay: some View {
+        ProgressView()
+            .padding()
+            .background(.thinMaterial, in: Capsule())
+            .padding(.top, 8)
+    }
+
+    var offlineView: some View {
         VStack(spacing: 16) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.largeTitle)
@@ -90,5 +102,19 @@ struct SearchView: View {
         }
         .padding()
         .glassBackground()
+    }
+}
+
+// MARK: - ViewModifiers
+private struct FilmRowStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, 12)
+    }
+}
+
+private extension View {
+    func filmRowStyle() -> some View {
+        modifier(FilmRowStyle())
     }
 }

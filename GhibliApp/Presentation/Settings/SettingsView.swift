@@ -5,13 +5,10 @@ struct SettingsView: View {
 
     @AppStorage(UserDefaultsKeys.appearanceTheme)
     private var appearanceTheme: AppearanceTheme = .system
-
     @AppStorage(UserDefaultsKeys.username)
     private var username: String = ""
-
     @AppStorage(UserDefaultsKeys.itemsPerPage)
     private var itemsPerPage: Int = 20
-
     @AppStorage(UserDefaultsKeys.notificationsEnabled)
     private var notificationsEnabled: Bool = true
 
@@ -39,7 +36,7 @@ struct SettingsView: View {
     var body: some View {
         ZStack(alignment: .top) {
             AppBackground()
-            content()
+            bodyContent
         }
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle("Ajustes")
@@ -57,9 +54,12 @@ struct SettingsView: View {
             )
         }
     }
+}
 
+// MARK: - Fillings
+private extension SettingsView {
     @ViewBuilder
-    private func content() -> some View {
+    var bodyContent: some View {
         switch viewModel.state {
         case .idle:
             Color.clear
@@ -81,66 +81,86 @@ struct SettingsView: View {
                 }
         case .empty:
             EmptyStateView(
-                title: "Nada para configurar", subtitle: "Volte mais tarde", fullScreen: true)
+                title: "Nada para configurar",
+                subtitle: "Volte mais tarde",
+                fullScreen: true
+            )
         case .error(let error):
             ErrorView(
-                message: error.message, retryTitle: "Tentar novamente",
-                retry: {
-                    viewModel.dismissNotification()
-                }, fullScreen: true)
+                message: error.message,
+                retryTitle: "Tentar novamente",
+                retry: { viewModel.dismissNotification() },
+                fullScreen: true
+            )
         }
     }
 
     private func mainLayout(_ content: SettingsViewContent) -> some View {
-        form
+        settingsForm
             .overlay(alignment: .bottom) {
                 messageBanner(for: content.notification)
             }
     }
 
-    private var form: some View {
+    private var settingsForm: some View {
         Form {
-            Section {
-                Picker("Appearance", selection: $appearanceTheme) {
-                    ForEach(AppearanceTheme.allCases) { theme in
-                        Text(theme.rawValue.capitalized).tag(theme)
-                    }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            } header: {
-                Text("Appearance")
-            } footer: {
-                Text("Overrides the system appearance to always use Light.")
-            }
-
-            Section("Account") {
-                TextField("Username", text: $username)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-
-            Section("Preferences") {
-                Stepper(
-                    "Items per page: \(itemsPerPage)", value: $itemsPerPage, in: 10...100, step: 5)
-                Toggle("Enable notifications", isOn: $notificationsEnabled)
-            }
-
-            Section("Cache") {
-                Button("Limpar cache offline") {
-                    viewModel.presentReset()
-                }
-            }
-
-            Section {
-                Button(role: .destructive) {
-                    resetDefaults()
-                } label: {
-                    Text("Reset to Defaults")
-                }
-            }
+            appearanceSection
+            accountSection
+            preferencesSection
+            cacheSection
+            destructiveSection
         }
         .scrollContentBackground(.hidden)
+    }
+
+    private var appearanceSection: some View {
+        Section {
+            Picker("Appearance", selection: $appearanceTheme) {
+                ForEach(AppearanceTheme.allCases) { theme in
+                    Text(theme.rawValue.capitalized).tag(theme)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } header: {
+            Text("Appearance")
+        } footer: {
+            Text("Overrides the system appearance to always use Light.")
+        }
+    }
+
+    private var accountSection: some View {
+        Section("Account") {
+            TextField("Username", text: $username)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+    }
+
+    private var preferencesSection: some View {
+        Section("Preferences") {
+            Stepper(
+                "Items per page: \(itemsPerPage)", value: $itemsPerPage, in: 10...100, step: 5)
+            Toggle("Enable notifications", isOn: $notificationsEnabled)
+        }
+    }
+
+    private var cacheSection: some View {
+        Section("Cache") {
+            Button("Limpar cache offline") {
+                viewModel.presentReset()
+            }
+        }
+    }
+
+    private var destructiveSection: some View {
+        Section {
+            Button(role: .destructive) {
+                resetDefaults()
+            } label: {
+                Text("Reset to Defaults")
+            }
+        }
     }
 
     @ViewBuilder

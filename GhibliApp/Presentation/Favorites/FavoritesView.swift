@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 struct FavoritesView: View {
     var viewModel: FavoritesViewModel
@@ -7,45 +8,45 @@ struct FavoritesView: View {
     var body: some View {
         ZStack {
             AppBackground()
-            content
+            bodyContent
         }
         .navigationTitle("Favoritos")
         .toolbarBackground(.hidden, for: .navigationBar)
-        .task {
-            await viewModel.load()
-        }
+        .task { await viewModel.load() }
     }
+}
 
+// MARK: - Fillings
+private extension FavoritesView {
     @ViewBuilder
-    private var content: some View {
+    var bodyContent: some View {
         switch viewModel.state {
         case .idle:
             Color.clear
         case .loading:
             LoadingView()
         case .refreshing(let content):
-            list(for: content)
+            filmsList(for: content)
                 .overlay(alignment: .top) { progressOverlay }
         case .loaded(let content):
-            list(for: content)
+            filmsList(for: content)
         case .empty:
             EmptyStateView(
-                title: "Sem favoritos", subtitle: "Adicione filmes aos favoritos para vê-los aqui", fullScreen: true)
+                title: "Sem favoritos",
+                subtitle: "Adicione filmes aos favoritos para vê-los aqui",
+                fullScreen: true
+            )
         case .error(let error):
-            ErrorView(message: error.message, retryTitle: "Recarregar", retry: {
-                Task { await viewModel.load() }
-            }, fullScreen: true)
+            ErrorView(
+                message: error.message,
+                retryTitle: "Recarregar",
+                retry: { Task { await viewModel.load() } },
+                fullScreen: true
+            )
         }
     }
 
-    private var progressOverlay: some View {
-        ProgressView()
-            .padding()
-            .background(.thinMaterial, in: Capsule())
-            .padding(.top, 8)
-    }
-
-    private func list(for content: FavoritesViewContent) -> some View {
+    private func filmsList(for content: FavoritesViewContent) -> some View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(content.films, id: \.id) { film in
@@ -58,15 +59,35 @@ struct FavoritesView: View {
                                 isFavorite: true,
                                 onToggleFavorite: { Task { await viewModel.toggle(film) } }
                             )
-                            .padding(.vertical, 12)
+                            .filmRowStyle()
                         }
                         .buttonStyle(.plain)
-
                         Divider()
                     }
                 }
             }
             .padding()
         }
+    }
+
+    var progressOverlay: some View {
+        ProgressView()
+            .padding()
+            .background(.thinMaterial, in: Capsule())
+            .padding(.top, 8)
+    }
+}
+
+// MARK: - ViewModifiers
+private struct FilmRowStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, 12)
+    }
+}
+
+private extension View {
+    func filmRowStyle() -> some View {
+        modifier(FilmRowStyle())
     }
 }

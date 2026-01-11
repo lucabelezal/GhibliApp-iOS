@@ -1,5 +1,6 @@
 import SwiftUI
 
+
 struct FilmsView: View {
     var viewModel: FilmsViewModel
     let openDetail: (Film) -> Void
@@ -8,44 +9,44 @@ struct FilmsView: View {
     var body: some View {
         ZStack(alignment: .top) {
             AppBackground()
-            content
+            bodyContent
             snackbar
         }
         .navigationTitle("Filmes")
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .task {
-            await viewModel.load()
-        }
-        .refreshable {
-            await viewModel.refresh()
-        }
+        .task { await viewModel.load() }
+        .refreshable { await viewModel.refresh() }
     }
+}
 
-    private var content: some View {
+// MARK: - Fillings
+private extension FilmsView {
+    var bodyContent: some View {
         List {
             switch viewModel.state {
             case .idle, .loading:
                 ForEach(0..<placeholderCount, id: \.self) { index in
-                    FilmRowPlaceholderRow(
-                        isFirst: index == 0, isLast: index == placeholderCount - 1
-                    )
+                    FilmRowPlaceholder(isLast: index == placeholderCount - 1)
                 }
-            case .refreshing(let content):
-                filmsList(for: content)
-            case .loaded(let content):
+            case .refreshing(let content), .loaded(let content):
                 filmsList(for: content)
             case .empty:
                 EmptyStateView(
-                    title: "Nada por aqui", subtitle: "Tente buscar novamente mais tarde", fullScreen: true
+                    title: "Nada por aqui",
+                    subtitle: "Tente buscar novamente mais tarde",
+                    fullScreen: true
                 )
                 .padding(.top, 24)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             case .error(let error):
-                ErrorView(message: error.message, retryTitle: "Tentar novamente", retry: {
-                    Task { await viewModel.load(forceRefresh: true) }
-                }, fullScreen: true)
+                ErrorView(
+                    message: error.message,
+                    retryTitle: "Tentar novamente",
+                    retry: { Task { await viewModel.load(forceRefresh: true) } },
+                    fullScreen: true
+                )
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             }
@@ -63,22 +64,7 @@ struct FilmsView: View {
     }
 
     @ViewBuilder
-    private var snackbar: some View {
-        if let snackbarState = viewModel.currentContent?.snackbar {
-            VStack {
-                ConnectivityBanner(state: snackbarState) {
-                    viewModel.dismissSnackbar()
-                }
-                .padding()
-                Spacer()
-            }
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(.spring(), value: snackbarState)
-        }
-    }
-
-    @ViewBuilder
-    private func filmsList(for content: FilmsViewContent) -> some View {
+    func filmsList(for content: FilmsViewContent) -> some View {
         if content.isOffline {
             Text("Você está offline - exibindo cache")
                 .font(.footnote)
@@ -96,12 +82,9 @@ struct FilmsView: View {
                     FilmRowView(
                         film: item.film,
                         isFavorite: item.isFavorite,
-                        onToggleFavorite: {
-                            Task { await viewModel.toggleFavorite(item.film) }
-                        }
+                        onToggleFavorite: { Task { await viewModel.toggleFavorite(item.film) } }
                     )
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 16)
+                    .filmRowStyle()
                 }
                 .buttonStyle(.plain)
 
@@ -114,24 +97,53 @@ struct FilmsView: View {
             .listRowBackground(Color.clear)
         }
     }
+
+    @ViewBuilder
+    var snackbar: some View {
+        if let snackbarState = viewModel.currentContent?.snackbar {
+            VStack {
+                ConnectivityBanner(state: snackbarState) {
+                    viewModel.dismissSnackbar()
+                }
+                .padding()
+                Spacer()
+            }
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(.spring(), value: snackbarState)
+        }
+    }
 }
 
-private struct FilmRowPlaceholderRow: View {
-    let isFirst: Bool
+// MARK: - Extras
+private struct FilmRowPlaceholder: View {
     let isLast: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             FilmRowPlaceholderView()
-                .padding(.vertical, 16)
-                .padding(.horizontal, 16)
+                .filmRowStyle()
 
-            if isLast == false {
+            if !isLast {
                 Divider()
             }
         }
         .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
+    }
+}
+
+// MARK: - ViewModifiers
+private struct FilmRowStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+    }
+}
+
+private extension View {
+    func filmRowStyle() -> some View {
+        modifier(FilmRowStyle())
     }
 }
