@@ -52,7 +52,10 @@ final class FilmDetailViewModel {
             film: film,
             fetchVehiclesUseCase: fetchVehiclesUseCase
         )
-        Task { await loadFavoriteState() }
+    }
+    
+    func loadInitialState() async {
+        await loadFavoriteState()
     }
 
     func refreshAllSections(forceRefresh: Bool = false) async {

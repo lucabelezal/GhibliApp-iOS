@@ -59,6 +59,7 @@ struct FilmDetailView: View {
                 await viewModel.refreshAllSections(forceRefresh: true)
             }
             .task {
+                await viewModel.loadInitialState()
                 await viewModel.refreshAllSections()
             }
             .scrollClipDisabled()
