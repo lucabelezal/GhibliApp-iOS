@@ -262,6 +262,46 @@ func loadInitialState() async {
 
 ---
 
+### ✅ RESOLVIDO: Task properties marcadas como nonisolated
+
+**Problema identificado:**
+```swift
+@MainActor
+@Observable
+final class FilmsViewModel {
+    private var connectivityTask: Task<Void, Never>?  // ❌ MainActor-isolated
+    
+    deinit {
+        connectivityTask?.cancel()  // ❌ Erro: acesso de contexto não-isolado
+    }
+}
+```
+
+**Solução aplicada:**
+```swift
+@MainActor
+@Observable
+final class FilmsViewModel {
+    nonisolated private var connectivityTask: Task<Void, Never>?  // ✅ Não-isolado
+    
+    deinit {
+        connectivityTask?.cancel()  // ✅ Acesso seguro
+    }
+}
+```
+
+**Justificativa:**
+- Em Swift 6, `deinit` é não-isolado por default
+- `Task.cancel()` é thread-safe e não requer MainActor
+- Propriedades Task podem ser marcadas como `nonisolated` para acesso seguro em deinit
+
+**Arquivos corrigidos:**
+- `FilmsViewModel.swift`
+- `SearchViewModel.swift`
+- `SettingsViewModel.swift`
+
+---
+
 ## ✨ SWIFT MODERNO — Oportunidades de Melhoria
 
 ### 1. Views sem @ObservedObject
