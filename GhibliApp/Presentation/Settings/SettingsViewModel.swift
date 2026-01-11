@@ -8,7 +8,7 @@ final class SettingsViewModel {
 
     private let clearCacheUseCase: ClearCacheUseCase
     private let clearFavoritesUseCase: ClearFavoritesUseCase
-    private var notificationDismissTask: Task<Void, Never>?
+    nonisolated private var notificationDismissTask: Task<Void, Never>?
 
     init(
         clearCacheUseCase: ClearCacheUseCase,

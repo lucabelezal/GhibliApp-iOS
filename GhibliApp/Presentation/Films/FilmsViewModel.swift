@@ -11,8 +11,8 @@ final class FilmsViewModel {
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    private var connectivityTask: Task<Void, Never>?
-    private var snackbarDismissTask: Task<Void, Never>?
+    nonisolated private var connectivityTask: Task<Void, Never>?
+    nonisolated private var snackbarDismissTask: Task<Void, Never>?
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,

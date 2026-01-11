@@ -12,8 +12,8 @@ final class SearchViewModel {
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    private var searchTask: Task<Void, Never>?
-    private var connectivityTask: Task<Void, Never>?
+    nonisolated private var searchTask: Task<Void, Never>?
+    nonisolated private var connectivityTask: Task<Void, Never>?
     private var isOffline = false
 
     init(
