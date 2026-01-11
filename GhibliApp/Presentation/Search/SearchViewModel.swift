@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 @MainActor
 @Observable
@@ -11,11 +12,10 @@ final class SearchViewModel {
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    // Nota: O compilador sugere 'nonisolated' mas isso causa erro com @Observable.
-    // 'nonisolated(unsafe)' é necessário para acessar do 'nonisolated deinit'.
-    // Este aviso do compilador é um falso positivo e pode ser ignorado.
-    nonisolated(unsafe) private var searchTask: Task<Void, Never>?
-    nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var searchTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var connectivityTask: Task<Void, Never>?
     private var isOffline = false
 
     init(
@@ -31,7 +31,7 @@ final class SearchViewModel {
         listenConnectivity()
     }
 
-    nonisolated deinit {
+    @MainActor deinit {
         searchTask?.cancel()
         connectivityTask?.cancel()
     }
@@ -48,6 +48,7 @@ final class SearchViewModel {
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled, let self else { return }
             await self.performSearch(query: newValue)
+            self.clearSearchTask()
         }
     }
 
@@ -86,9 +87,16 @@ final class SearchViewModel {
     }
 
     private func listenConnectivity() {
-        connectivityTask = Task { [observeConnectivityUseCase] in
+        connectivityTask?.cancel()
+        connectivityTask = Task { [weak self, observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
+                guard !Task.isCancelled else { break }
+                guard let self else { return }
                 self.handleConnectivityChange(isConnected: isConnected)
+            }
+
+            if let self {
+                self.clearConnectivityTask()
             }
         }
     }
@@ -108,8 +116,9 @@ final class SearchViewModel {
 
         searchTask?.cancel()
         searchTask = Task { [weak self] in
-            guard let self else { return }
+            guard !Task.isCancelled, let self else { return }
             await self.performSearch(query: self.query)
+            self.clearSearchTask()
         }
     }
 
@@ -128,5 +137,13 @@ final class SearchViewModel {
         if case .loaded(let content) = state { return content }
         if case .refreshing(let content) = state { return content }
         return nil
+    }
+
+    private func clearSearchTask() {
+        searchTask = nil
+    }
+
+    private func clearConnectivityTask() {
+        connectivityTask = nil
     }
 }

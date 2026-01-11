@@ -27,11 +27,18 @@ actor SyncManager {
     }
 
     func start() {
+        backgroundTask?.cancel()
         // Dispara uma Task do próprio actor para manter o escopo seguro.
         backgroundTask = Task { [weak self] in
-            await self?.initializeState()
-            await self?.observeConnectivityAndSync()
+            guard let self else { return }
+            await self.runBackgroundLoop()
         }
+    }
+
+    private func runBackgroundLoop() async {
+        defer { backgroundTask = nil }
+        await initializeState()
+        await observeConnectivityAndSync()
     }
 
     private func initializeState() async {
@@ -43,6 +50,9 @@ actor SyncManager {
         // connectivityStream pode estar isolado; aguardamos para respeitar o actor correto.
         let stream = await connectivity.connectivityStream
         for await online in stream {
+            if Task.isCancelled {
+                break
+            }
             if !(await FeatureFlags.syncEnabled) {
                 state = .disabled
                 continue
@@ -54,6 +64,9 @@ actor SyncManager {
     }
 
     private func processPendingChanges() async {
+        if Task.isCancelled {
+            return
+        }
         guard await FeatureFlags.syncEnabled else {
             state = .disabled
             return

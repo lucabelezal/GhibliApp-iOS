@@ -56,7 +56,7 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
             let online = path.status == .satisfied
             // Propaga no main thread para manter o consumo seguro para UI
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard !Task.isCancelled, let self else { return }
                 let continuations = await self.storage.continuations()
                 continuations.forEach { $0.yield(online) }
             }
@@ -67,7 +67,7 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
     deinit {
         monitor.cancel()
         let storage = storage
-        Task {
+        Task.detached(priority: .utility) {
             let continuations = await storage.drain()
             continuations.forEach { $0.finish() }
         }
@@ -77,14 +77,14 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
         AsyncStream { continuation in
             let box = ContinuationBox(continuation)
             let storage = storage
-            Task {
+            Task.detached(priority: .utility) {
                 await storage.append(box)
             }
 
             continuation.onTermination = { @Sendable _ in
                 // Seguro acessar o storage via Task, mesmo a partir desta closure Sendable
                 let storage = self.storage
-                Task {
+                Task.detached(priority: .utility) {
                     await storage.remove(box)
                 }
             }

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 @MainActor
 @Observable
@@ -10,11 +11,10 @@ final class FilmsViewModel {
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    // Nota: O compilador sugere 'nonisolated' mas isso causa erro com @Observable.
-    // 'nonisolated(unsafe)' é necessário para acessar do 'nonisolated deinit'.
-    // Este aviso do compilador é um falso positivo e pode ser ignorado.
-    nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
-    nonisolated(unsafe) private var snackbarDismissTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var connectivityTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var snackbarDismissTask: Task<Void, Never>?
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,
@@ -29,7 +29,7 @@ final class FilmsViewModel {
         listenToConnectivity()
     }
 
-    nonisolated deinit {
+    @MainActor deinit {
         connectivityTask?.cancel()
         snackbarDismissTask?.cancel()
     }
@@ -106,9 +106,16 @@ final class FilmsViewModel {
     }
 
     private func listenToConnectivity() {
-        connectivityTask = Task { [observeConnectivityUseCase] in
+        connectivityTask?.cancel()
+        connectivityTask = Task { [weak self, observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                handleConnectivityChange(isConnected: isConnected)
+                guard !Task.isCancelled else { break }
+                guard let self else { return }
+                self.handleConnectivityChange(isConnected: isConnected)
+            }
+
+            if let self {
+                self.clearConnectivityTaskReference()
             }
         }
     }
@@ -140,14 +147,23 @@ final class FilmsViewModel {
         snackbarDismissTask = Task { [weak self] in
             try? await Task.sleep(
                 nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
-            guard let self else { return }
+            guard !Task.isCancelled, let self else { return }
             self.dismissSnackbarIfNeeded(for: state)
+            self.clearSnackbarDismissTask()
         }
     }
 
     private func dismissSnackbarIfNeeded(for state: ConnectivityBanner.State) {
         guard let content = currentContent, content.snackbar == state else { return }
         dismissSnackbar()
+    }
+
+    private func clearConnectivityTaskReference() {
+        connectivityTask = nil
+    }
+
+    private func clearSnackbarDismissTask() {
+        snackbarDismissTask = nil
     }
 
     private func replaceLoadedState(with content: FilmsViewContent) {

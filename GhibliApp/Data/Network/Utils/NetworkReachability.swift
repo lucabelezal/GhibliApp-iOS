@@ -19,7 +19,10 @@ public actor NetworkReachabilityAdapter: NetworkReachability {
 		self.status = monitor.currentPath.status
 
 		monitor.pathUpdateHandler = { [weak self] path in
-			Task { await self?.updateStatus(path.status) }
+			Task.detached(priority: .utility) { [weak self] in
+				guard !Task.isCancelled, let self else { return }
+				await self.updateStatus(path.status)
+			}
 		}
 		monitor.start(queue: queue)
 	}

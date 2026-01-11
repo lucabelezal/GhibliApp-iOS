@@ -37,40 +37,35 @@ final class SwiftDataAdapter: StorageAdapter {
 
     func save<T: Codable & Sendable>(_ value: T, for key: String) async throws {
         let payload = try JSONEncoder().encode(value)
-        await MainActor.run {
-            let ctx = self.context
-            if let existing = fetchPayload(for: key, in: ctx) {
-                existing.data = payload
-            } else {
-                ctx.insert(CachedPayload(key: key, data: payload))
-            }
-            try? ctx.save()
+        let ctx = context
+
+        if let existing = try fetchPayload(for: key, in: ctx) {
+            existing.data = payload
+        } else {
+            ctx.insert(CachedPayload(key: key, data: payload))
         }
+
+        try ctx.save()
     }
 
     func load<T: Codable & Sendable>(_ type: T.Type, for key: String) async throws -> T? {
-        return try await MainActor.run {
-            let ctx = self.context
-            guard let payload = fetchPayload(for: key, in: ctx) else { return nil }
-            return try JSONDecoder().decode(T.self, from: payload.data)
-        }
+        let ctx = context
+        guard let payload = try fetchPayload(for: key, in: ctx) else { return nil }
+        return try JSONDecoder().decode(T.self, from: payload.data)
     }
 
     func clearAll() async throws {
-        await MainActor.run {
-            let ctx = self.context
-            let descriptor = FetchDescriptor<CachedPayload>()
-            if let items = try? ctx.fetch(descriptor) {
-                items.forEach { ctx.delete($0) }
-                try? ctx.save()
-            }
-        }
+        let ctx = context
+        let descriptor = FetchDescriptor<CachedPayload>()
+        let items = try ctx.fetch(descriptor)
+        items.forEach { ctx.delete($0) }
+        try ctx.save()
     }
 
-    private func fetchPayload(for key: String, in context: ModelContext) -> CachedPayload? {
+    private func fetchPayload(for key: String, in context: ModelContext) throws -> CachedPayload? {
         let descriptor = FetchDescriptor<CachedPayload>(
             predicate: #Predicate { $0.key == key }
         )
-        return try? context.fetch(descriptor).first
+        return try context.fetch(descriptor).first
     }
 }

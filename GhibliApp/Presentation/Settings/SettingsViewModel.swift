@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 @MainActor
 @Observable
@@ -7,10 +8,8 @@ final class SettingsViewModel {
 
     private let clearCacheUseCase: ClearCacheUseCase
     private let clearFavoritesUseCase: ClearFavoritesUseCase
-    // Nota: O compilador sugere 'nonisolated' mas isso causa erro com @Observable.
-    // 'nonisolated(unsafe)' é necessário para acessar do 'nonisolated deinit'.
-    // Este aviso do compilador é um falso positivo e pode ser ignorado.
-    nonisolated(unsafe) private var notificationDismissTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var notificationDismissTask: Task<Void, Never>?
 
     init(
         clearCacheUseCase: ClearCacheUseCase,
@@ -20,7 +19,7 @@ final class SettingsViewModel {
         self.clearFavoritesUseCase = clearFavoritesUseCase
     }
 
-    nonisolated deinit {
+    @MainActor deinit {
         notificationDismissTask?.cancel()
     }
 
@@ -68,7 +67,9 @@ final class SettingsViewModel {
         notificationDismissTask?.cancel()
         notificationDismissTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            self?.dismissNotification()
+            guard !Task.isCancelled, let self else { return }
+            self.dismissNotification()
+            self.clearNotificationDismissTask()
         }
     }
 
@@ -89,6 +90,10 @@ final class SettingsViewModel {
         } else {
             state = .loaded(updated)
         }
+    }
+
+    private func clearNotificationDismissTask() {
+        notificationDismissTask = nil
     }
 }
 
