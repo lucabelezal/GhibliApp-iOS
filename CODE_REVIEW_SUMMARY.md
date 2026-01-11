@@ -52,6 +52,34 @@ final class FilmsViewModel {
 - `SettingsViewModel.swift`
 - `FilmDetailViewModel.swift`
 - `FilmDetailSectionViewModel.swift`
+- `RootView.swift` (substituído `@StateObject` por `@State`)
+
+---
+
+### ✅ RESOLVIDO: Views atualizadas para @State
+
+**Antes (com @StateObject — Legacy):**
+```swift
+struct RootView: View {
+    @StateObject private var filmsViewModel: FilmsViewModel
+}
+```
+
+**Depois (com @State — Swift 6):**
+```swift
+struct RootView: View {
+    @State private var filmsViewModel: FilmsViewModel
+}
+```
+
+**Impacto:**
+- ✅ `@StateObject` usado apenas para `ObservableObject`
+- ✅ `@State` usado com `@Observable` (Swift 6)
+- ✅ Sintaxe consistente em toda a aplicação
+- `SearchViewModel.swift`
+- `SettingsViewModel.swift`
+- `FilmDetailViewModel.swift`
+- `FilmDetailSectionViewModel.swift`
 
 ---
 
