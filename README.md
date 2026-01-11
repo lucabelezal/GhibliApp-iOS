@@ -169,8 +169,6 @@ Há uma pasta de apoio com recursos visuais em `Docs/Screenshots/` contendo prin
 - `Docs/Screenshots/settings.png` — configuracoes
 - `Docs/Screenshots/search.png` — busca
 
-Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as imagens para `Docs/Screenshots/` e atualizei os links abaixo para caminhos relativos dentro do repositório.
-
 ### Sequência visual (fluxo de uso)
 Abaixo a sequência das telas principais — carregamento → lista → detalhe → favoritos → busca → configurações.
 
@@ -181,4 +179,5 @@ Abaixo a sequência das telas principais — carregamento → lista → detalhe 
 <img src="Docs/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/> ➡️ 
 <img src="Docs/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/>
 
-Os caminhos foram atualizados para `Docs/Screenshots/<nome>.png` (case-sensitive). Se preferir outro padrão de nomecnclatura, me diga e eu ajusto.
+Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as imagens para `Docs/Screenshots/` e atualizei os links abaixo para caminhos relativos dentro do repositório.
+
