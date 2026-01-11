@@ -38,6 +38,164 @@ Swift Concurrency é poderosa, mas ainda jovem. Aqui estão pontos para evitar p
 - Teste código concorrente com atenção a efeitos colaterais.
 - Revise warnings do compilador sobre Sendable e isolamento.
 
+## Exemplos de Código
+
+Abaixo há exemplos concisos mostrando padrões problemáticos e alternativas recomendadas.
+
+### Split Isolation (problemático)
+Exemplo problemático — metade do tipo é isolada pelo `@MainActor`, metade não:
+```swift
+class SomeClass {
+	var name: String
+
+	@MainActor
+	var value: Int
+
+	init(name: String, value: Int) {
+		self.name = name
+		self.value = value
+	}
+}
+```
+Correção recomendada — isole o tipo inteiro quando ele precisa estar no `MainActor`:
+```swift
+@MainActor
+class SomeClass {
+	var name: String
+	var value: Int
+
+	init(name: String, value: Int) {
+		self.name = name
+		self.value = value
+	}
+}
+```
+
+### `Task.detached` vs `Task` (uso errado comum)
+Problemático — `Task.detached` não herda prioridade nem valores de contexto:
+```swift
+@MainActor
+func doSomeStuff() {
+	Task.detached {
+		await expensiveWork()
+	}
+}
+
+nonisolated func expensiveWork() async {
+	// trabalho pesado
+}
+```
+Melhor abordagem — crie uma função `nonisolated` ou use `Task {}` para herdar contexto:
+```swift
+@MainActor
+func doSomeStuff() {
+	Task {
+		await expensiveWork()
+	}
+}
+
+nonisolated func expensiveWork() async {
+	// trabalho pesado
+}
+```
+
+### Prioridades explícitas (use com cuidado)
+Explícito, mas documente o motivo:
+```swift
+// Background porque isto não é crítico para a UI
+Task(priority: .background) {
+	await someNonCriticalWork()
+}
+```
+
+### `MainActor.run` (evitar quando possível)
+Evitar quando a função já é `@MainActor`:
+```swift
+// evita usar MainActor.run desnecessariamente
+@MainActor
+func doMainActorStuff() async { /* ... */ }
+
+// prefira:
+await doMainActorStuff()
+
+// em vez de:
+await MainActor.run {
+	doMainActorStuff()
+}
+```
+
+### Actors sem estado (evitar quando sem propósito)
+Se o actor não protege estado mutável, considere uma função `nonisolated`:
+```swift
+// actor sem estado — provavelmente desnecessário
+actor StatlessWorker {
+	func doWork() async { /* ... */ }
+}
+
+// alternativa: função não isolada/utility
+nonisolated func doWork() async { /* ... */ }
+```
+
+### Bloquear thread esperando async (exemplo perigoso)
+Nunca bloqueie a thread principal com `DispatchSemaphore` esperando por trabalho async:
+```swift
+func dangerousSync() {
+	let sem = DispatchSemaphore(value: 0)
+	Task {
+		await asyncWork()
+		sem.signal()
+	}
+	// isto pode deadlock se executado no MainThread
+	sem.wait()
+}
+```
+
+### Actor conformando a protocolo com método síncrono
+Isto não funciona como esperado porque chamadas síncronas fora do actor não são permitidas:
+```swift
+protocol DataSource {
+	func fetch() -> String
+}
+
+actor MyActor: DataSource {
+	// erro: não é possível satisfazer com método síncrono
+	func fetch() -> String {
+		"value"
+	}
+}
+```
+Correção: tornar o método `async` no protocolo / conformidade:
+```swift
+protocol AsyncDataSource {
+	func fetch() async -> String
+}
+
+actor MyActor: AsyncDataSource {
+	func fetch() async -> String {
+		"value"
+	}
+}
+```
+
+### Evitando usos incorretos de tipos não `Sendable`
+Se um tipo não é `Sendable`, não o mova livremente entre tasks — prefira isolamento/statically-scoped use:
+```swift
+class NonSendableWrapper {
+	var nsObject: NSObject
+	init(nsObject: NSObject) { self.nsObject = nsObject }
+}
+
+// Ao expor isso a tasks, o compilador vai avisar. Em vez disso, mantenha acesso isolado
+@MainActor
+func useWrapper(_ w: NonSendableWrapper) async {
+	// uso seguro, preservando isolamento
+	let value = w.nsObject.description
+	print(value)
+}
+```
+
+## Exemplos do Projeto
+
 ## Exemplos do Projeto
 - Refatoração de `Task.detached` para `async let` em requests paralelos na tela de detalhes do filme.
 - Uso consistente de `@MainActor` em ViewModels.
