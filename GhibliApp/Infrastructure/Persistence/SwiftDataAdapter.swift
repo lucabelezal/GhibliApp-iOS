@@ -12,7 +12,15 @@ final class CachedPayload {
     }
 }
 
-final class SwiftDataAdapter: StorageAdapter, @unchecked Sendable {
+/// Adaptador de armazenamento baseado em SwiftData para cache offline.
+///
+/// **Segurança de Concorrência:**
+/// - Isolado ao `@MainActor` porque o `ModelContext` do SwiftData requer acesso na thread principal.
+/// - Todas as operações são garantidas de executar no main actor.
+/// - Chamadores usam `await` para coordenar com o isolamento do MainActor.
+/// - Não precisa de `@unchecked Sendable` - o isolamento adequado do actor garante segurança de threads.
+@MainActor
+final class SwiftDataAdapter: StorageAdapter {
     static let shared = SwiftDataAdapter()
 
     private let container: ModelContainer

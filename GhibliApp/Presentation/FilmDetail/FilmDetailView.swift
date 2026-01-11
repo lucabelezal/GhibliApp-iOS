@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FilmDetailView: View {
-    @ObservedObject var viewModel: FilmDetailViewModel
+    var viewModel: FilmDetailViewModel
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -59,6 +59,7 @@ struct FilmDetailView: View {
                 await viewModel.refreshAllSections(forceRefresh: true)
             }
             .task {
+                await viewModel.loadInitialState()
                 await viewModel.refreshAllSections()
             }
             .scrollClipDisabled()

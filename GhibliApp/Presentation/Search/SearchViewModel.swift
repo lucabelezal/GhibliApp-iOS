@@ -1,18 +1,21 @@
-import Combine
 import Foundation
 
 @MainActor
-final class SearchViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<SearchViewContent> = .idle
-    @Published private(set) var query: String = ""
+@Observable
+final class SearchViewModel {
+    private(set) var state: ViewState<SearchViewContent> = .idle
+    private(set) var query: String = ""
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    private var searchTask: Task<Void, Never>?
-    private var connectivityTask: Task<Void, Never>?
+    // Nota: O compilador sugere 'nonisolated' mas isso causa erro com @Observable.
+    // 'nonisolated(unsafe)' é necessário para acessar do 'nonisolated deinit'.
+    // Este aviso do compilador é um falso positivo e pode ser ignorado.
+    nonisolated(unsafe) private var searchTask: Task<Void, Never>?
+    nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
     private var isOffline = false
 
     init(
@@ -28,7 +31,7 @@ final class SearchViewModel: ObservableObject {
         listenConnectivity()
     }
 
-    deinit {
+    nonisolated deinit {
         searchTask?.cancel()
         connectivityTask?.cancel()
     }
@@ -85,9 +88,7 @@ final class SearchViewModel: ObservableObject {
     private func listenConnectivity() {
         connectivityTask = Task { [observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                await MainActor.run {
-                    self.handleConnectivityChange(isConnected: isConnected)
-                }
+                self.handleConnectivityChange(isConnected: isConnected)
             }
         }
     }

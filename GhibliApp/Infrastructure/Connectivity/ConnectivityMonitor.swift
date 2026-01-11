@@ -5,6 +5,17 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "dev.ghibliapp.connectivity")
 
+    /// Wrapper para AsyncStream.Continuation para habilitar conformidade Sendable.
+    ///
+    /// **Notas de Segurança de Concorrência:**
+    /// - Marcado como `@unchecked Sendable` porque `AsyncStream.Continuation` não é Sendable por padrão.
+    /// - **Garantia de Segurança:** Todo acesso às continuations é protegido pelo actor `ContinuationStorage`,
+    ///   que fornece armazenamento isolado e thread-safe.
+    /// - A continuation em si é imutável (`let`) e apenas armazenada/acessada através do isolamento do actor.
+    /// - Este padrão é seguro porque:
+    ///   1. Continuations são append-only (sem mutação após criação).
+    ///   2. Actor garante acesso serial ao array de armazenamento.
+    ///   3. Todos os yields/finishes acontecem no MainActor, prevenindo data races.
     private final class ContinuationBox: @unchecked Sendable {
         let continuation: AsyncStream<Bool>.Continuation
         init(_ continuation: AsyncStream<Bool>.Continuation) {

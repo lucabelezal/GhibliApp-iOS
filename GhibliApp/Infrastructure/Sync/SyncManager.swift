@@ -1,10 +1,11 @@
 import Foundation
 
+/// Representa o estado do SyncManager de forma thread-safe.
 enum SyncState: Sendable {
     case disabled
     case idle
     case syncing
-    case error(Error?)
+    case error(String)  // Usa String (sempre Sendable) ao invés de Error
 }
 
 /// Coordena o processamento de `PendingChange` quando há conectividade.
@@ -76,10 +77,10 @@ actor SyncManager {
                 }
                 state = .idle
             } catch {
-                state = .error(error)
+                state = .error("Sync failed: \(error.localizedDescription)")
             }
         } catch {
-            state = .error(error)
+            state = .error("Failed to load pending changes: \(error.localizedDescription)")
         }
     }
 

@@ -5,18 +5,18 @@ struct RootView: View {
     @Bindable var router: AppRouter
     let container: AppContainer
 
-    @StateObject private var filmsViewModel: FilmsViewModel
-    @StateObject private var favoritesViewModel: FavoritesViewModel
-    @StateObject private var searchViewModel: SearchViewModel
-    @StateObject private var settingsViewModel: SettingsViewModel
+    let filmsViewModel: FilmsViewModel
+    let favoritesViewModel: FavoritesViewModel
+    let searchViewModel: SearchViewModel
+    let settingsViewModel: SettingsViewModel
 
     init(router: AppRouter, container: AppContainer) {
         self._router = Bindable(router)
         self.container = container
-        _filmsViewModel = StateObject(wrappedValue: container.makeFilmsViewModel())
-        _favoritesViewModel = StateObject(wrappedValue: container.makeFavoritesViewModel())
-        _searchViewModel = StateObject(wrappedValue: container.makeSearchViewModel())
-        _settingsViewModel = StateObject(wrappedValue: container.makeSettingsViewModel())
+        self.filmsViewModel = container.makeFilmsViewModel()
+        self.favoritesViewModel = container.makeFavoritesViewModel()
+        self.searchViewModel = container.makeSearchViewModel()
+        self.settingsViewModel = container.makeSettingsViewModel()
     }
 
     var body: some View {

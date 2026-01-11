@@ -1,18 +1,20 @@
-import Combine
 import Foundation
-import UIKit
 
 @MainActor
-final class FilmsViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<FilmsViewContent> = .idle
+@Observable
+final class FilmsViewModel {
+    private(set) var state: ViewState<FilmsViewContent> = .idle
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    private var connectivityTask: Task<Void, Never>?
-    private var snackbarDismissTask: Task<Void, Never>?
+    // Nota: O compilador sugere 'nonisolated' mas isso causa erro com @Observable.
+    // 'nonisolated(unsafe)' é necessário para acessar do 'nonisolated deinit'.
+    // Este aviso do compilador é um falso positivo e pode ser ignorado.
+    nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
+    nonisolated(unsafe) private var snackbarDismissTask: Task<Void, Never>?
 
     init(
         fetchFilmsUseCase: FetchFilmsUseCase,
@@ -27,7 +29,7 @@ final class FilmsViewModel: ObservableObject {
         listenToConnectivity()
     }
 
-    deinit {
+    nonisolated deinit {
         connectivityTask?.cancel()
         snackbarDismissTask?.cancel()
     }
@@ -106,9 +108,7 @@ final class FilmsViewModel: ObservableObject {
     private func listenToConnectivity() {
         connectivityTask = Task { [observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                await MainActor.run {
-                    handleConnectivityChange(isConnected: isConnected)
-                }
+                handleConnectivityChange(isConnected: isConnected)
             }
         }
     }
@@ -132,8 +132,7 @@ final class FilmsViewModel: ObservableObject {
     }
 
     private func provideFeedback(for state: ConnectivityBanner.State) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(state == .connected ? .success : .error)
+        // Feedback tátil tratado pela camada de View usando modificador .sensoryFeedback
     }
 
     private func scheduleSnackbarDismiss(for state: ConnectivityBanner.State) {
@@ -142,7 +141,7 @@ final class FilmsViewModel: ObservableObject {
             try? await Task.sleep(
                 nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
             guard let self else { return }
-            await MainActor.run { self.dismissSnackbarIfNeeded(for: state) }
+            self.dismissSnackbarIfNeeded(for: state)
         }
     }
 

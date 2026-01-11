@@ -1,9 +1,9 @@
-import Combine
 import Foundation
 
 @MainActor
-final class FavoritesViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<FavoritesViewContent> = .idle
+@Observable
+final class FavoritesViewModel {
+    private(set) var state: ViewState<FavoritesViewContent> = .idle
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
