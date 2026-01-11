@@ -160,20 +160,20 @@ Sinta-se a vontade para abrir issues ou PRs com melhorias, especialmente em torn
 
 ## Documentação e capturas
 
-Há uma pasta de apoio com recursos visuais em `GhibliApp/Docs/Screenshots/` contendo prints do app que ajudam no onboarding e revisão de UI. Arquivos atuais:
+Há uma pasta de apoio com recursos visuais em `GhibliApp/Screenshots/` contendo prints do app que ajudam no onboarding e revisão de UI. Arquivos atuais:
 
-- `GhibliApp/Docs/Screenshots/loadingFilms.png` — estado de carregamento
-- `GhibliApp/Docs/Screenshots/films.png` — lista de filmes
-- `GhibliApp/Docs/Screenshots/filmDetail.png` — tela de detalhe do filme
-- `GhibliApp/Docs/Screenshots/favorites.png` — tela de favoritos
-- `GhibliApp/Docs/Screenshots/settings.png` — configuracoes
-- `GhibliApp/Docs/Screenshots/search.png` — busca
+- `GhibliApp/Screenshots/loadingFilms.png` — estado de carregamento
+- `GhibliApp/Screenshots/films.png` — lista de filmes
+- `GhibliApp/Screenshots/filmDetail.png` — tela de detalhe do filme
+- `GhibliApp/Screenshots/favorites.png` — tela de favoritos
+- `GhibliApp/Screenshots/settings.png` — configuracoes
+- `GhibliApp/Screenshots/search.png` — busca
 
-Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as imagens para `GhibliApp/Docs/Screenshots/` e atualizei os links abaixo para caminhos relativos dentro do repositório.
+Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as imagens para `GhibliApp/Screenshots/` e atualizei os links abaixo para caminhos relativos dentro do repositório.
 
 ### Sequência visual (fluxo de uso)
 Abaixo a sequência das telas principais — carregamento → lista → detalhe → favoritos → busca → configurações.
 
-<img src="GhibliApp/Docs/Screenshots/loadingFilms.png" alt="Loading" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/films.png" alt="Films" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/filmDetail.png" alt="Film Detail" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/favorites.png" alt="Favorites" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Docs/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/>
+<img src="GhibliApp/Screenshots/loadingFilms.png" alt="Loading" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Screenshots/films.png" alt="Films" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Screenshots/filmDetail.png" alt="Film Detail" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Screenshots/favorites.png" alt="Favorites" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="GhibliApp/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/>
 
-Os caminhos foram atualizados para `GhibliApp/Docs/Screenshots/<nome>.png` (case-sensitive). Se preferir outro padrão de nomecnclatura, me diga e eu ajusto.
+Os caminhos foram atualizados para `GhibliApp/Screenshots/<nome>.png` (case-sensitive). Se preferir outro padrão de nomecnclatura, me diga e eu ajusto.
