@@ -1,10 +1,10 @@
 import Combine
 import Foundation
-import UIKit
 
 @MainActor
-final class FilmsViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<FilmsViewContent> = .idle
+@Observable
+final class FilmsViewModel {
+    private(set) var state: ViewState<FilmsViewContent> = .idle
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
@@ -106,9 +106,7 @@ final class FilmsViewModel: ObservableObject {
     private func listenToConnectivity() {
         connectivityTask = Task { [observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                await MainActor.run {
-                    handleConnectivityChange(isConnected: isConnected)
-                }
+                handleConnectivityChange(isConnected: isConnected)
             }
         }
     }
@@ -132,8 +130,8 @@ final class FilmsViewModel: ObservableObject {
     }
 
     private func provideFeedback(for state: ConnectivityBanner.State) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(state == .connected ? .success : .error)
+        // Haptic feedback should be handled by the view layer, not ViewModel
+        // Views can use sensoryFeedback modifier in SwiftUI
     }
 
     private func scheduleSnackbarDismiss(for state: ConnectivityBanner.State) {
@@ -142,7 +140,7 @@ final class FilmsViewModel: ObservableObject {
             try? await Task.sleep(
                 nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
             guard let self else { return }
-            await MainActor.run { self.dismissSnackbarIfNeeded(for: state) }
+            self.dismissSnackbarIfNeeded(for: state)
         }
     }
 

@@ -2,9 +2,10 @@ import Combine
 import Foundation
 
 @MainActor
-final class SearchViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<SearchViewContent> = .idle
-    @Published private(set) var query: String = ""
+@Observable
+final class SearchViewModel {
+    private(set) var state: ViewState<SearchViewContent> = .idle
+    private(set) var query: String = ""
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
@@ -85,9 +86,7 @@ final class SearchViewModel: ObservableObject {
     private func listenConnectivity() {
         connectivityTask = Task { [observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                await MainActor.run {
-                    self.handleConnectivityChange(isConnected: isConnected)
-                }
+                self.handleConnectivityChange(isConnected: isConnected)
             }
         }
     }

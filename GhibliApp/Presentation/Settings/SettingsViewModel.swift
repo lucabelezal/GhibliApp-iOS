@@ -2,8 +2,9 @@ import Combine
 import Foundation
 
 @MainActor
-final class SettingsViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<SettingsViewContent> = .loaded(.initial)
+@Observable
+final class SettingsViewModel {
+    private(set) var state: ViewState<SettingsViewContent> = .loaded(.initial)
 
     private let clearCacheUseCase: ClearCacheUseCase
     private let clearFavoritesUseCase: ClearFavoritesUseCase
@@ -65,9 +66,7 @@ final class SettingsViewModel: ObservableObject {
         notificationDismissTask?.cancel()
         notificationDismissTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await MainActor.run {
-                self?.dismissNotification()
-            }
+            self?.dismissNotification()
         }
     }
 

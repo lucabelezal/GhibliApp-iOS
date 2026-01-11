@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FilmsView: View {
-    @ObservedObject var viewModel: FilmsViewModel
+    var viewModel: FilmsViewModel
     let openDetail: (Film) -> Void
     private let placeholderCount = 6
 

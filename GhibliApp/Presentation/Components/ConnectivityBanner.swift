@@ -26,6 +26,12 @@ struct ConnectivityBanner: View {
         )
         .shadow(radius: 10)
         .transition(.move(edge: .top).combined(with: .opacity))
+        .sensoryFeedback(.success, trigger: state) { oldValue, newValue in
+            newValue == .connected && oldValue != newValue
+        }
+        .sensoryFeedback(.error, trigger: state) { oldValue, newValue in
+            newValue == .disconnected && oldValue != newValue
+        }
     }
 }
 

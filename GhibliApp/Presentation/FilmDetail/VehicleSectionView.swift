@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct VehicleSectionView: View {
-    @ObservedObject var viewModel: FilmDetailSectionViewModel<Vehicle>
+    var viewModel: FilmDetailSectionViewModel<Vehicle>
 
     var body: some View {
         FilmDetailCarouselSectionView(

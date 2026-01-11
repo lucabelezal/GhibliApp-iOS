@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FilmDetailView: View {
-    @ObservedObject var viewModel: FilmDetailViewModel
+    var viewModel: FilmDetailViewModel
 
     var body: some View {
         ZStack(alignment: .top) {

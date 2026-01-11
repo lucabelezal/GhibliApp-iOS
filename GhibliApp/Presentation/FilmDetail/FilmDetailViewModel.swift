@@ -2,9 +2,10 @@ import Combine
 import Foundation
 
 @MainActor
-final class FilmDetailViewModel: ObservableObject {
+@Observable
+final class FilmDetailViewModel {
     let film: Film
-    @Published private(set) var state: ViewState<FilmDetailViewContent> = .idle
+    private(set) var state: ViewState<FilmDetailViewContent> = .idle
 
     let charactersSectionViewModel: FilmDetailSectionViewModel<Person>
     let locationsSectionViewModel: FilmDetailSectionViewModel<Location>
@@ -79,12 +80,10 @@ final class FilmDetailViewModel: ObservableObject {
         let species = try? await speciesTask.value
         let vehicles = try? await vehiclesTask.value
 
-        await MainActor.run {
-            if let people { charactersSectionViewModel.setItems(people) }
-            if let locations { locationsSectionViewModel.setItems(locations) }
-            if let species { speciesSectionViewModel.setItems(species) }
-            if let vehicles { vehiclesSectionViewModel.setItems(vehicles) }
-        }
+        if let people { charactersSectionViewModel.setItems(people) }
+        if let locations { locationsSectionViewModel.setItems(locations) }
+        if let species { speciesSectionViewModel.setItems(species) }
+        if let vehicles { vehiclesSectionViewModel.setItems(vehicles) }
     }
 
     func toggleFavorite() async {

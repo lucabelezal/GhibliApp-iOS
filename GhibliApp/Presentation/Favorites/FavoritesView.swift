@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FavoritesView: View {
-    @ObservedObject var viewModel: FavoritesViewModel
+    var viewModel: FavoritesViewModel
     let openDetail: (Film) -> Void
 
     var body: some View {
