@@ -179,5 +179,3 @@ Abaixo a sequência das telas principais — carregamento → lista → detalhe 
 <img src="Docs/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/> ➡️ 
 <img src="Docs/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/>
 
-Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as imagens para `Docs/Screenshots/` e atualizei os links abaixo para caminhos relativos dentro do repositório.
-
