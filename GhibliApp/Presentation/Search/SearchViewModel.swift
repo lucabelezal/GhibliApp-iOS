@@ -1,17 +1,20 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class SearchViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<SearchViewContent> = .idle
-    @Published private(set) var query: String = ""
+@Observable
+final class SearchViewModel {
+    private(set) var state: ViewState<SearchViewContent> = .idle
+    private(set) var query: String = ""
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
+    @ObservationIgnored
     private var searchTask: Task<Void, Never>?
+    @ObservationIgnored
     private var connectivityTask: Task<Void, Never>?
     private var isOffline = false
 
@@ -28,7 +31,7 @@ final class SearchViewModel: ObservableObject {
         listenConnectivity()
     }
 
-    deinit {
+    @MainActor deinit {
         searchTask?.cancel()
         connectivityTask?.cancel()
     }
@@ -45,6 +48,7 @@ final class SearchViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled, let self else { return }
             await self.performSearch(query: newValue)
+            self.clearSearchTask()
         }
     }
 
@@ -83,11 +87,16 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func listenConnectivity() {
-        connectivityTask = Task { [observeConnectivityUseCase] in
+        connectivityTask?.cancel()
+        connectivityTask = Task { [weak self, observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                await MainActor.run {
-                    self.handleConnectivityChange(isConnected: isConnected)
-                }
+                guard !Task.isCancelled else { break }
+                guard let self else { return }
+                self.handleConnectivityChange(isConnected: isConnected)
+            }
+
+            if let self {
+                self.clearConnectivityTask()
             }
         }
     }
@@ -107,8 +116,9 @@ final class SearchViewModel: ObservableObject {
 
         searchTask?.cancel()
         searchTask = Task { [weak self] in
-            guard let self else { return }
+            guard !Task.isCancelled, let self else { return }
             await self.performSearch(query: self.query)
+            self.clearSearchTask()
         }
     }
 
@@ -127,5 +137,13 @@ final class SearchViewModel: ObservableObject {
         if case .loaded(let content) = state { return content }
         if case .refreshing(let content) = state { return content }
         return nil
+    }
+
+    private func clearSearchTask() {
+        searchTask = nil
+    }
+
+    private func clearConnectivityTask() {
+        connectivityTask = nil
     }
 }

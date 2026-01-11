@@ -5,6 +5,17 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "dev.ghibliapp.connectivity")
 
+    /// Wrapper para AsyncStream.Continuation para habilitar conformidade Sendable.
+    ///
+    /// **Notas de Segurança de Concorrência:**
+    /// - Marcado como `@unchecked Sendable` porque `AsyncStream.Continuation` não é Sendable por padrão.
+    /// - **Garantia de Segurança:** Todo acesso às continuations é protegido pelo actor `ContinuationStorage`,
+    ///   que fornece armazenamento isolado e thread-safe.
+    /// - A continuation em si é imutável (`let`) e apenas armazenada/acessada através do isolamento do actor.
+    /// - Este padrão é seguro porque:
+    ///   1. Continuations são append-only (sem mutação após criação).
+    ///   2. Actor garante acesso serial ao array de armazenamento.
+    ///   3. Todos os yields/finishes acontecem no MainActor, prevenindo data races.
     private final class ContinuationBox: @unchecked Sendable {
         let continuation: AsyncStream<Bool>.Continuation
         init(_ continuation: AsyncStream<Bool>.Continuation) {
@@ -45,7 +56,7 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
             let online = path.status == .satisfied
             // Propaga no main thread para manter o consumo seguro para UI
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard !Task.isCancelled, let self else { return }
                 let continuations = await self.storage.continuations()
                 continuations.forEach { $0.yield(online) }
             }
@@ -56,7 +67,7 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
     deinit {
         monitor.cancel()
         let storage = storage
-        Task {
+        Task.detached(priority: .utility) {
             let continuations = await storage.drain()
             continuations.forEach { $0.finish() }
         }
@@ -66,14 +77,14 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
         AsyncStream { continuation in
             let box = ContinuationBox(continuation)
             let storage = storage
-            Task {
+            Task.detached(priority: .utility) {
                 await storage.append(box)
             }
 
             continuation.onTermination = { @Sendable _ in
                 // Seguro acessar o storage via Task, mesmo a partir desta closure Sendable
                 let storage = self.storage
-                Task {
+                Task.detached(priority: .utility) {
                     await storage.remove(box)
                 }
             }

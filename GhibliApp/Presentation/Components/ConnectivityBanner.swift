@@ -10,6 +10,10 @@ struct ConnectivityBanner: View {
     let dismiss: () -> Void
 
     var body: some View {
+        content
+    }
+    
+    private var content: some View {
         HStack(spacing: 12) {
             Image(systemName: state == .connected ? "wifi" : "wifi.exclamationmark")
             Text(state == .connected ? "Conexão restabelecida" : "Sem conexão")

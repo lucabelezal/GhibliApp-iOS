@@ -1,10 +1,10 @@
-import Combine
 import Foundation
 
 @MainActor
-final class FilmDetailViewModel: ObservableObject {
+@Observable
+final class FilmDetailViewModel {
     let film: Film
-    @Published private(set) var state: ViewState<FilmDetailViewContent> = .idle
+    private(set) var state: ViewState<FilmDetailViewContent> = .idle
 
     let charactersSectionViewModel: FilmDetailSectionViewModel<Person>
     let locationsSectionViewModel: FilmDetailSectionViewModel<Location>
@@ -51,40 +51,27 @@ final class FilmDetailViewModel: ObservableObject {
             film: film,
             fetchVehiclesUseCase: fetchVehiclesUseCase
         )
-        Task { await loadFavoriteState() }
+    }
+
+    func loadInitialState() async {
+        await loadFavoriteState()
     }
 
     func refreshAllSections(forceRefresh: Bool = false) async {
-        let filmCopy = film
-        let peopleUseCase = fetchPeopleUseCase
-        let locationsUseCase = fetchLocationsUseCase
-        let speciesUseCase = fetchSpeciesUseCase
-        let vehiclesUseCase = fetchVehiclesUseCase
+        async let people = fetchPeopleUseCase.execute(for: film, forceRefresh: forceRefresh)
+        async let locations = fetchLocationsUseCase.execute(for: film, forceRefresh: forceRefresh)
+        async let species = fetchSpeciesUseCase.execute(for: film, forceRefresh: forceRefresh)
+        async let vehicles = fetchVehiclesUseCase.execute(for: film, forceRefresh: forceRefresh)
 
-        let peopleTask = Task.detached {
-            try await peopleUseCase.execute(for: filmCopy, forceRefresh: forceRefresh)
-        }
-        let locationsTask = Task.detached {
-            try await locationsUseCase.execute(for: filmCopy, forceRefresh: forceRefresh)
-        }
-        let speciesTask = Task.detached {
-            try await speciesUseCase.execute(for: filmCopy, forceRefresh: forceRefresh)
-        }
-        let vehiclesTask = Task.detached {
-            try await vehiclesUseCase.execute(for: filmCopy, forceRefresh: forceRefresh)
-        }
+        let peopleResult = try? await people
+        let locationsResult = try? await locations
+        let speciesResult = try? await species
+        let vehiclesResult = try? await vehicles
 
-        let people = try? await peopleTask.value
-        let locations = try? await locationsTask.value
-        let species = try? await speciesTask.value
-        let vehicles = try? await vehiclesTask.value
-
-        await MainActor.run {
-            if let people { charactersSectionViewModel.setItems(people) }
-            if let locations { locationsSectionViewModel.setItems(locations) }
-            if let species { speciesSectionViewModel.setItems(species) }
-            if let vehicles { vehiclesSectionViewModel.setItems(vehicles) }
-        }
+        if let peopleResult { charactersSectionViewModel.setItems(peopleResult) }
+        if let locationsResult { locationsSectionViewModel.setItems(locationsResult) }
+        if let speciesResult { speciesSectionViewModel.setItems(speciesResult) }
+        if let vehiclesResult { vehiclesSectionViewModel.setItems(vehiclesResult) }
     }
 
     func toggleFavorite() async {

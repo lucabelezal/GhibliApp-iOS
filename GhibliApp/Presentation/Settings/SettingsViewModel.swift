@@ -1,12 +1,14 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class SettingsViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<SettingsViewContent> = .loaded(.initial)
+@Observable
+final class SettingsViewModel {
+    private(set) var state: ViewState<SettingsViewContent> = .loaded(.initial)
 
     private let clearCacheUseCase: ClearCacheUseCase
     private let clearFavoritesUseCase: ClearFavoritesUseCase
+    @ObservationIgnored
     private var notificationDismissTask: Task<Void, Never>?
 
     init(
@@ -17,7 +19,7 @@ final class SettingsViewModel: ObservableObject {
         self.clearFavoritesUseCase = clearFavoritesUseCase
     }
 
-    deinit {
+    @MainActor deinit {
         notificationDismissTask?.cancel()
     }
 
@@ -65,9 +67,9 @@ final class SettingsViewModel: ObservableObject {
         notificationDismissTask?.cancel()
         notificationDismissTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await MainActor.run {
-                self?.dismissNotification()
-            }
+            guard !Task.isCancelled, let self else { return }
+            self.dismissNotification()
+            self.clearNotificationDismissTask()
         }
     }
 
@@ -89,4 +91,9 @@ final class SettingsViewModel: ObservableObject {
             state = .loaded(updated)
         }
     }
+
+    private func clearNotificationDismissTask() {
+        notificationDismissTask = nil
+    }
 }
+

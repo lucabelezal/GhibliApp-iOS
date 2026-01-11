@@ -16,6 +16,7 @@ final class AppContainer {
     private let clearCacheUseCase: ClearCacheUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
     private let syncManager: SyncManager
+    private var syncStartTask: Task<Void, Never>?
 
     private init() {
         let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
@@ -85,7 +86,13 @@ final class AppContainer {
 
         self.router = AppRouter()
 
-        Task { await syncManager.start() }
+        syncStartTask = Task.detached(priority: .utility) { [syncManager] in
+            await syncManager.start()
+        }
+    }
+
+    deinit {
+        syncStartTask?.cancel()
     }
 
     func makeFilmsViewModel() -> FilmsViewModel {

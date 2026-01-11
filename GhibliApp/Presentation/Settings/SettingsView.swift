@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @ObservedObject var viewModel: SettingsViewModel
+    var viewModel: SettingsViewModel
 
     @AppStorage(UserDefaultsKeys.appearanceTheme)
     private var appearanceTheme: AppearanceTheme = .system

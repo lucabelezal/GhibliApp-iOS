@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SearchView: View {
-    @ObservedObject var viewModel: SearchViewModel
+    var viewModel: SearchViewModel
     let openDetail: (Film) -> Void
 
     var body: some View {

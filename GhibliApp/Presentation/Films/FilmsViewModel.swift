@@ -1,17 +1,19 @@
-import Combine
 import Foundation
-import UIKit
+import Observation
 
 @MainActor
-final class FilmsViewModel: ObservableObject {
-    @Published private(set) var state: ViewState<FilmsViewContent> = .idle
+@Observable
+final class FilmsViewModel {
+    private(set) var state: ViewState<FilmsViewContent> = .idle
 
     private let fetchFilmsUseCase: FetchFilmsUseCase
     private let getFavoritesUseCase: GetFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
+    @ObservationIgnored
     private var connectivityTask: Task<Void, Never>?
+    @ObservationIgnored
     private var snackbarDismissTask: Task<Void, Never>?
 
     init(
@@ -27,7 +29,7 @@ final class FilmsViewModel: ObservableObject {
         listenToConnectivity()
     }
 
-    deinit {
+    @MainActor deinit {
         connectivityTask?.cancel()
         snackbarDismissTask?.cancel()
     }
@@ -104,11 +106,16 @@ final class FilmsViewModel: ObservableObject {
     }
 
     private func listenToConnectivity() {
-        connectivityTask = Task { [observeConnectivityUseCase] in
+        connectivityTask?.cancel()
+        connectivityTask = Task { [weak self, observeConnectivityUseCase] in
             for await isConnected in observeConnectivityUseCase.stream {
-                await MainActor.run {
-                    handleConnectivityChange(isConnected: isConnected)
-                }
+                guard !Task.isCancelled else { break }
+                guard let self else { return }
+                self.handleConnectivityChange(isConnected: isConnected)
+            }
+
+            if let self {
+                self.clearConnectivityTaskReference()
             }
         }
     }
@@ -132,8 +139,7 @@ final class FilmsViewModel: ObservableObject {
     }
 
     private func provideFeedback(for state: ConnectivityBanner.State) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(state == .connected ? .success : .error)
+        // Feedback tátil tratado pela camada de View usando modificador .sensoryFeedback
     }
 
     private func scheduleSnackbarDismiss(for state: ConnectivityBanner.State) {
@@ -141,14 +147,23 @@ final class FilmsViewModel: ObservableObject {
         snackbarDismissTask = Task { [weak self] in
             try? await Task.sleep(
                 nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
-            guard let self else { return }
-            await MainActor.run { self.dismissSnackbarIfNeeded(for: state) }
+            guard !Task.isCancelled, let self else { return }
+            self.dismissSnackbarIfNeeded(for: state)
+            self.clearSnackbarDismissTask()
         }
     }
 
     private func dismissSnackbarIfNeeded(for state: ConnectivityBanner.State) {
         guard let content = currentContent, content.snackbar == state else { return }
         dismissSnackbar()
+    }
+
+    private func clearConnectivityTaskReference() {
+        connectivityTask = nil
+    }
+
+    private func clearSnackbarDismissTask() {
+        snackbarDismissTask = nil
     }
 
     private func replaceLoadedState(with content: FilmsViewContent) {
