@@ -174,6 +174,11 @@ Sinta-se à vontade para renomear ou reorganizar esses arquivos; eu já movi as 
 ### Sequência visual (fluxo de uso)
 Abaixo a sequência das telas principais — carregamento → lista → detalhe → favoritos → busca → configurações.
 
-<img src="Docs/Screenshots/loadingFilms.png" alt="Loading" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="Docs/Screenshots/films.png" alt="Films" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="Docs/Screenshots/filmDetail.png" alt="Film Detail" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="Docs/Screenshots/favorites.png" alt="Favorites" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="Docs/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ <img src="Docs/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/>
+<img src="Docs/Screenshots/loadingFilms.png" alt="Loading" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ 
+<img src="Docs/Screenshots/films.png" alt="Films" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ 
+<img src="Docs/Screenshots/filmDetail.png" alt="Film Detail" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ 
+<img src="Docs/Screenshots/favorites.png" alt="Favorites" width="240" style="vertical-align:middle;margin-right:8px"/> ➡️ 
+<img src="Docs/Screenshots/settings.png" alt="Settings" width="240" style="vertical-align:middle"/> ➡️ 
+<img src="Docs/Screenshots/search.png" alt="Search" width="240" style="vertical-align:middle;margin-right:8px"/>
 
 Os caminhos foram atualizados para `Docs/Screenshots/<nome>.png` (case-sensitive). Se preferir outro padrão de nomecnclatura, me diga e eu ajusto.
