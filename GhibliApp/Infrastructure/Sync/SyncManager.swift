@@ -1,15 +1,20 @@
 import Foundation
 
 /// Representa o estado do SyncManager de forma thread-safe.
+/// 
+/// Armazena mensagens de erro como String ao invés de Error
+/// para garantir conformidade com Sendable.
 enum SyncState: Sendable {
     case disabled
     case idle
     case syncing
-    case error(String)  // Armazena mensagem de erro ao invés de Error para garantir Sendable
+    case error(String)
 }
 
 /// Coordena o processamento de `PendingChange` quando há conectividade.
-/// Expõe `state` para facilitar observabilidade.
+/// 
+/// Expõe `state` para facilitar observabilidade. Opera como actor
+/// para garantir acesso thread-safe ao estado de sincronização.
 actor SyncManager {
     private let connectivity: ConnectivityRepositoryProtocol
     private let pendingStore: PendingChangeStore

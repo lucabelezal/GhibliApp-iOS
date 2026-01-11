@@ -116,7 +116,6 @@ final class FilmsViewModel {
         let snackbarState: ConnectivityBanner.State = isConnected ? .connected : .disconnected
         let updated = content.updatingConnectivity(isOffline: !isConnected, snackbar: snackbarState)
         replaceLoadedState(with: updated)
-        provideFeedback(for: snackbarState)
         scheduleSnackbarDismiss(for: snackbarState)
     }
 
@@ -125,13 +124,7 @@ final class FilmsViewModel {
         replaceLoadedState(
             with: content.updatingConnectivity(isOffline: content.isOffline, snackbar: state)
         )
-        provideFeedback(for: state)
         scheduleSnackbarDismiss(for: state)
-    }
-
-    private func provideFeedback(for state: ConnectivityBanner.State) {
-        // Haptic feedback should be handled by the view layer, not ViewModel
-        // Views can use sensoryFeedback modifier in SwiftUI
     }
 
     private func scheduleSnackbarDismiss(for state: ConnectivityBanner.State) {

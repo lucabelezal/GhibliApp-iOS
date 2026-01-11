@@ -13,8 +13,12 @@ final class CachedPayload {
 }
 
 /// SwiftDataAdapter isolado ao MainActor para garantir thread-safety.
+/// 
 /// Todas as operações devem ser chamadas de contextos async, permitindo
 /// que o sistema coordene o acesso ao MainActor automaticamente.
+/// 
+/// SwiftData exige que ModelContext seja acessado no MainActor, portanto
+/// toda a classe está isolada. Chamadores usam `await` para coordenar.
 @MainActor
 final class SwiftDataAdapter: StorageAdapter {
     static let shared = SwiftDataAdapter()
