@@ -661,6 +661,244 @@ struct FilmRow: View {
          PAI redesenha! ✅
 ```
 
+---
+
+### 🤔 DÚVIDA COMUM: Preciso usar `$` para passar o ViewModel?
+
+> **Esta é uma das dúvidas mais frequentes ao migrar do UIKit para SwiftUI!**
+
+**RESPOSTA CURTA: NÃO!** O `$` só é usado para criar **Bindings** de propriedades específicas, não para passar objetos completos.
+
+#### 🎯 A Regra do `$`:
+
+```swift
+// ✅ Passa o OBJETO INTEIRO → SEM $
+FilmRow(viewModel: viewModel)
+//                 ^^^^^^^^^ objeto de referência
+
+// ✅ Passa UMA PROPRIEDADE específica → COM $
+SearchBar(text: $viewModel.searchText)
+//             ^^^^^^^^^^^^^^^^^^^^^ Binding<String>
+```
+
+---
+
+#### 📚 Explicação Detalhada:
+
+##### 1️⃣ **Quando NÃO usar `$` (passar objeto inteiro)**
+
+```swift
+// ✅ CORRETO - Passa o objeto inteiro
+struct FilmsView: View {
+    @StateObject var viewModel = FilmsViewModel()
+    
+    var body: some View {
+        List(viewModel.films) { film in
+            // ✅ Passa viewModel SEM $
+            FilmRow(film: film, viewModel: viewModel)
+        }
+    }
+}
+
+struct FilmRow: View {
+    let film: Film
+    @ObservedObject var viewModel: FilmsViewModel // Recebe o objeto inteiro
+    
+    var body: some View {
+        Button(action: {
+            // ✅ Acessa métodos e propriedades do ViewModel
+            viewModel.toggleFavorite(film)
+        }) {
+            Text(film.title)
+        }
+    }
+}
+```
+
+**Por quê funciona sem `$`?**
+- ✅ `viewModel` já É uma referência (reference type - classe)
+- ✅ SwiftUI passa automaticamente a referência do objeto
+- ✅ `@ObservedObject` observa mudanças em `@Published` properties
+- ✅ A filha pode acessar **todo o ViewModel** (métodos + propriedades)
+- ✅ Mudanças na filha SIM refletem no pai (é o mesmo objeto!)
+
+##### 2️⃣ **Quando usar `$` (passar Binding de propriedade específica)**
+
+```swift
+// ✅ Quando você quer passar UMA propriedade específica
+struct ParentView: View {
+    @StateObject var viewModel = FilmsViewModel()
+    
+    var body: some View {
+        VStack {
+            // ✅ Passa APENAS a propriedade searchText como Binding
+            SearchBar(searchText: $viewModel.searchText)
+            
+            // ✅ Passa o objeto inteiro
+            FilmsList(viewModel: viewModel)
+        }
+    }
+}
+
+struct SearchBar: View {
+    @Binding var searchText: String // Recebe APENAS a String
+    
+    var body: some View {
+        TextField("Search", text: $searchText) // ✅ Pode modificar
+    }
+}
+
+struct FilmsList: View {
+    @ObservedObject var viewModel: FilmsViewModel // Recebe o objeto inteiro
+    
+    var body: some View {
+        List(viewModel.films) { film in
+            Text(film.title)
+        }
+    }
+}
+```
+
+**Por quê usar `$` aqui?**
+- ✅ `$viewModel.searchText` cria um `Binding<String>`
+- ✅ A filha não precisa conhecer o ViewModel inteiro
+- ✅ Apenas lê/escreve naquela propriedade específica
+- ✅ Mais desacoplado e reutilizável
+- ✅ `SearchBar` pode ser usado com qualquer `String`, não apenas do ViewModel
+
+---
+
+#### 🔍 Comparação Visual:
+
+**Sem `$` - Passa o objeto inteiro:**
+
+```
+ParentView
+@StateObject viewModel ━━━━━━━━━━━━━━━━━━━┓
+                                        ┃
+                        ┏━━━━━━━━━━━━━━━┛
+                        ┃
+                        ┃ Referência ao objeto inteiro
+                        ┃
+                        ┃ ChildView
+                        ┃ @ObservedObject var viewModel: FilmsViewModel
+                        ┃ 
+                        ┃ Pode acessar:
+                        ┃ ✅ viewModel.films
+                        ┃ ✅ viewModel.searchText
+                        ┃ ✅ viewModel.toggleFavorite()
+                        ┃ ✅ viewModel.loadFilms()
+                        ┗━━ TUDO do ViewModel
+```
+
+**Com `$` - Passa binding de UMA propriedade:**
+
+```
+ParentView
+@StateObject viewModel
+    └── searchText: String ━━━━━━━━━━━━━━┓
+                                        ┃
+                        ┏━━━━━━━━━━━━━━━┛
+                        ┃
+                        ┃ Binding<String>
+                        ┃
+                        ┃ ChildView
+                        ┃ @Binding var searchText: String
+                        ┃ 
+                        ┃ Pode acessar:
+                        ┗━━ APENAS searchText (leitura/escrita)
+```
+
+---
+
+#### 🐛 Erro Comum: Tentar usar `$` com objeto inteiro
+
+```swift
+// ❌ ERRADO - Tenta passar viewModel com $
+struct FilmsView: View {
+    @StateObject var viewModel = FilmsViewModel()
+    
+    var body: some View {
+        FilmRow(viewModel: $viewModel)
+        //                 ^ Erro de compilação!
+        // Cannot convert value of type 'Binding<FilmsViewModel>' 
+        // to expected type 'FilmsViewModel'
+    }
+}
+
+// ✅ CORRETO
+struct FilmsView: View {
+    @StateObject var viewModel = FilmsViewModel()
+    
+    var body: some View {
+        FilmRow(viewModel: viewModel) // SEM $
+    }
+}
+```
+
+---
+
+#### 💡 Quando usar cada abordagem:
+
+**📦 Passa o objeto inteiro (sem `$`):**
+
+✅ A filha precisa de múltiplas propriedades  
+✅ A filha precisa chamar métodos do ViewModel  
+✅ Mais simples quando a filha é fortemente acoplada ao ViewModel  
+
+```swift
+// Exemplo: FilmRow precisa do ViewModel inteiro
+FilmRow(viewModel: viewModel) // Acessa métodos e propriedades
+```
+
+**🔗 Passa Binding (com `$`):**
+
+✅ A filha precisa de UMA propriedade apenas  
+✅ Quer desacoplar a filha do ViewModel  
+✅ Quer reutilizar a filha com diferentes tipos  
+✅ Componentes genéricos e reutilizáveis  
+
+```swift
+// Exemplo: SearchBar só precisa do texto
+SearchBar(text: $viewModel.searchText) // Acessa só o texto
+```
+
+---
+
+#### 📖 Tabela de Decisão:
+
+| Cenário | Sintaxe | Tipo Passado | Wrapper na Filha |
+|---------|---------|--------------|------------------|
+| **Objeto completo** | `viewModel` | `FilmsViewModel` | `@ObservedObject var viewModel: FilmsViewModel` |
+| **Uma propriedade (leitura/escrita)** | `$viewModel.searchText` | `Binding<String>` | `@Binding var searchText: String` |
+| **Uma propriedade (apenas leitura)** | `viewModel.searchText` | `String` | `let searchText: String` |
+
+---
+
+#### 🎓 Resumo da Regra:
+
+```swift
+// ✅ Quer passar o OBJETO INTEIRO?
+FilmRow(viewModel: viewModel)           
+//                 ^^^^^^^^^ SEM $ - passa referência
+
+// ✅ Quer passar UMA PROPRIEDADE para leitura/escrita?
+SearchBar(text: $viewModel.searchText)  
+//             ^ COM $ - cria Binding
+
+// ✅ Quer passar UMA PROPRIEDADE apenas para leitura?
+TitleView(title: viewModel.title)
+//               ^^^^^^^^^^^^^^^^ SEM $ - passa valor
+```
+
+**No exemplo do `FilmRow`:**
+- ✅ Precisa do ViewModel inteiro (para chamar `toggleFavorite()`)
+- ✅ Por isso passa `viewModel` sem `$`
+- ✅ E recebe com `@ObservedObject var viewModel: FilmsViewModel`
+- ✅ Mudanças na filha SIM refletem no pai (mesmo objeto!)
+
+---
+
 ### ⚠️ Quando as mudanças refletem?
 
 **RESPOSTA:** Sempre que o objeto é compartilhado!
