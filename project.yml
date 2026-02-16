@@ -1,0 +1,96 @@
+name: GhibliApp
+options:
+  bundleIdPrefix: br.com
+  deploymentTarget:
+    iOS: '18.0'
+  xcodeVersion: '16.2'
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  groupOrdering:
+    - pattern: '^.*$'
+      order: [Domain, Data, Infrastructure, Presentation, App, Utils, Resources, GhibliAppTests, GhibliAppUITests, Docs, Scripts, Templates]
+
+configs:
+  Debug: debug
+  Release: release
+
+packages:
+  Alamofire:
+    url: https://github.com/Alamofire/Alamofire.git
+    from: 5.11.0
+
+targets:
+  GhibliApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: GhibliApp
+    resources:
+      - path: GhibliApp/Resources
+    dependencies:
+      - package: Alamofire
+    settings:
+      base:
+        PRODUCT_NAME: GhibliApp
+        PRODUCT_BUNDLE_IDENTIFIER: br.com.GhibliApp
+        CODE_SIGN_ENTITLEMENTS: GhibliApp/Resources/GhibliApp.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+    scheme:
+      testTargets:
+        - GhibliAppTests
+        - GhibliAppUITests
+    buildPhases:
+      - sources:
+          paths:
+            - GhibliApp
+      - resources:
+          paths:
+            - GhibliApp/Resources
+    # preBuildScripts:
+    #   - name: Swift Lint
+    #     script: |
+    #       if command -v swiftlint >/dev/null 2>&1
+    #       then
+    #           swiftlint
+    #       else
+    #           echo "warning: \`swiftlint\` command not found - See https://github.com/realm/SwiftLint#installation for installation instructions."
+    #       fi
+    #     outputFiles:
+    #       - $(DERIVED_FILES_DIR)/SwiftLintCache
+    preBuildScripts:
+      - name: Swift Lint
+        script: |
+          if [[ "$(uname -m)" == "arm64" ]]; then
+            export PATH="/opt/homebrew/bin:$PATH"
+          fi
+
+          if command -v swiftlint >/dev/null 2>&1
+          then
+              swiftlint
+          else
+              echo "warning: \`swiftlint\` command not found - See https://github.com/realm/SwiftLint#installation for installation instructions."
+          fi
+        outputFiles:
+          - $(DERIVED_FILES_DIR)/SwiftLintCache
+
+  GhibliAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: GhibliAppTests
+    dependencies:
+      - target: GhibliApp
+    settings:
+      base:
+        PRODUCT_NAME: GhibliAppTests
+
+  GhibliAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: GhibliAppUITests
+    dependencies:
+      - target: GhibliApp
+    settings:
+      base:
+        PRODUCT_NAME: GhibliAppUITests
