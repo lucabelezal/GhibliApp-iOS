@@ -145,20 +145,31 @@ UI → ViewModel → UseCase → Repository
 ```
 
 ## Configuracao de Build
-1. Instale XcodeGen e SwiftGen:
+
+### Setup inicial
+1. Instale as dependencias (XcodeGen, SwiftGen, SwiftLint, SwiftFormat):
   ```sh
-  brew install xcodegen swiftgen
+  make setup
   ```
-2. Gere o projeto Xcode e os arquivos de strings:
+
+### Build do projeto
+2. Gere o projeto Xcode e os arquivos de recursos:
   ```sh
-  xcodegen generate
-  swiftgen config run --config swiftgen.yml
+  make generate
   ```
 3. Abra o projeto gerado (`GhibliApp.xcodeproj`) ou execute via CLI:
   ```sh
   xcodebuild -scheme GhibliApp -destination 'platform=iOS Simulator,name=iPhone 17' clean build
   ```
 4. Execute a aplicacao no simulador desejado.
+
+### Comandos disponiveis
+- `make setup` - Instala todas as dependencias necessarias
+- `make generate` - Gera o projeto Xcode e recursos (default)
+- `make lint` - Executa SwiftLint
+- `make format` - Formata o codigo com SwiftFormat
+- `make clean` - Remove arquivos gerados
+- `make help` - Exibe ajuda com todos os comandos
 
 ## Testes
 - `GhibliAppTests/` e `GhibliAppUITests/` fornecem a base para cenarios unitarios e de UI.
