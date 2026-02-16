@@ -8,7 +8,7 @@ options:
   groupSortPosition: top
   groupOrdering:
     - pattern: '^.*$'
-      order: [Domain, Data, Infrastructure, Presentation, App, Utils, Resources, GhibliAppTests, GhibliAppUITests, Docs, Scripts, Templates]
+      order: [GhibliApp, GhibliAppTests, GhibliAppUITests, Docs, Scripts, Templates]
 
 configs:
   Debug: debug
