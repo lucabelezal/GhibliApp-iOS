@@ -2,8 +2,8 @@ name: GhibliApp
 options:
   bundleIdPrefix: br.com
   deploymentTarget:
-    iOS: '18.0'
-  xcodeVersion: '16.2'
+    iOS: '26.2'
+  xcodeVersion: '26.2'
   generateEmptyDirectories: true
   groupSortPosition: top
   groupOrdering:
@@ -48,17 +48,6 @@ targets:
       - resources:
           paths:
             - GhibliApp/Resources
-    # preBuildScripts:
-    #   - name: Swift Lint
-    #     script: |
-    #       if command -v swiftlint >/dev/null 2>&1
-    #       then
-    #           swiftlint
-    #       else
-    #           echo "warning: \`swiftlint\` command not found - See https://github.com/realm/SwiftLint#installation for installation instructions."
-    #       fi
-    #     outputFiles:
-    #       - $(DERIVED_FILES_DIR)/SwiftLintCache
     preBuildScripts:
       - name: Swift Lint
         script: |
