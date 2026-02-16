@@ -1,7 +1,7 @@
 .PHONY: all setup generate lint format clean help
 
-# Default target
-all: generate
+# Default target - show menu
+all: help
 
 # Setup: Install dependencies
 setup:
