@@ -11,7 +11,8 @@
 2. [Exercícios Intermediários](#exercícios-intermediários) - @StateObject, @ObservedObject
 3. [Exercícios Avançados](#exercícios-avançados) - @Observable, Arquitetura
 4. [Desafios de Debugging](#desafios-de-debugging) - Encontre e corrija bugs
-5. [Projeto Final](#projeto-final) - Integração completa
+5. [Exercícios Especializados](#exercícios-especializados) - @ObservedObject vs @Binding, @Environment, @EnvironmentObject, AppContainer
+6. [Projeto Final](#projeto-final) - Integração completa
 
 ---
 
@@ -1417,6 +1418,973 @@ struct ContentView: View {
 
 ---
 
+## Exercícios Especializados
+
+### 🎯 Exercício 4.1: @ObservedObject vs @Binding - Quando usar?
+
+**Objetivo:** Entender a diferença crucial entre passar o ViewModel completo vs uma Binding.
+
+**Tarefa:** Você tem uma tela de Produto com botão de favorito. Decida se deve usar `@ObservedObject` ou `@Binding` e implemente ambas as abordagens.
+
+**Cenário A: View precisa de lógica complexa**
+
+```swift
+// O favoritar envolve:
+// - Validar se usuário está logado
+// - Salvar no backend
+// - Atualizar cache local
+// - Disparar analytics
+// - Mostrar erro se falhar
+
+class ProductsViewModel: ObservableObject {
+    @Published var products: [Product] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    func toggleFavorite(_ product: Product) async {
+        // Lógica complexa aqui
+    }
+    
+    func isFavorite(_ product: Product) -> Bool {
+        // Verifica no cache
+        return false
+    }
+}
+
+struct ProductRow: View {
+    let product: Product
+    // ✍️ VOCÊ DECIDE: @ObservedObject ou @Binding?
+    
+    var body: some View {
+        // SEU CÓDIGO AQUI
+    }
+}
+```
+
+**Cenário B: View só precisa de um valor**
+
+```swift
+// A SearchBar só precisa do texto, sem lógica
+
+class SearchViewModel: ObservableObject {
+    @Published var searchText: String = ""
+    @Published var results: [Product] = []
+    
+    func search() async {
+        // Busca produtos com searchText
+    }
+}
+
+struct SearchBar: View {
+    // ✍️ VOCÊ DECIDE: @ObservedObject ou @Binding?
+    
+    var body: some View {
+        // SEU CÓDIGO AQUI
+    }
+}
+```
+
+<details>
+<summary>💡 Solução</summary>
+
+**Cenário A: Use @ObservedObject (precisa do ViewModel)**
+
+```swift
+struct ProductRow: View {
+    let product: Product
+    @ObservedObject var viewModel: ProductsViewModel // ✅ ViewModel completo!
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(product.name)
+                    .font(.headline)
+                Text("$\(product.price, specifier: "%.2f")")
+                    .font(.subheadline)
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                Task {
+                    // ✅ Chama MÉTODO com LÓGICA complexa
+                    await viewModel.toggleFavorite(product)
+                }
+            }) {
+                Image(systemName: viewModel.isFavorite(product) ? "heart.fill" : "heart")
+                    .foregroundColor(.red)
+            }
+        }
+    }
+}
+
+// View pai
+struct ProductListView: View {
+    @StateObject var viewModel = ProductsViewModel()
+    
+    var body: some View {
+        List(viewModel.products) { product in
+            // ✅ Passa o ViewModel completo
+            ProductRow(product: product, viewModel: viewModel)
+        }
+    }
+}
+```
+
+**Por que @ObservedObject?**
+- ✅ View precisa chamar `toggleFavorite()` (método com lógica)
+- ✅ Lógica de negócio fica no ViewModel (MVVM)
+- ✅ View pode precisar de outras propriedades/métodos no futuro
+- ✅ Reutiliza a mesma instância do ViewModel
+
+---
+
+**Cenário B: Use @Binding (só precisa do texto)**
+
+```swift
+struct SearchBar: View {
+    @Binding var text: String // ✅ Só o texto!
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            
+            TextField("Buscar produtos", text: $text)
+                .textFieldStyle(.plain)
+            
+            if !text.isEmpty {
+                Button(action: { text = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+    }
+}
+
+// View pai
+struct SearchView: View {
+    @StateObject var viewModel = SearchViewModel()
+    
+    var body: some View {
+        VStack {
+            // ✅ Passa apenas a propriedade necessária
+            SearchBar(text: $viewModel.searchText)
+                .padding()
+            
+            List(viewModel.results) { product in
+                Text(product.name)
+            }
+        }
+        .onChange(of: viewModel.searchText) { oldValue, newValue in
+            Task {
+                await viewModel.search()
+            }
+        }
+    }
+}
+```
+
+**Por que @Binding?**
+- ✅ SearchBar não precisa do ViewModel inteiro
+- ✅ SearchBar não tem lógica de negócio (só exibe/edita)
+- ✅ Componente genérico e reutilizável:
+  ```swift
+  SearchBar(text: $productSearch) // ✅
+  SearchBar(text: $userSearch)    // ✅
+  SearchBar(text: $citySearch)    // ✅
+  ```
+- ✅ Desacoplado da implementação
+
+---
+
+**Regra de Decisão:**
+
+```swift
+// ✅ @ObservedObject quando:
+// - View precisa de MÉTODOS do ViewModel
+// - View precisa de MÚLTIPLAS propriedades
+// - Há LÓGICA DE NEGÓCIO envolvida
+
+// ✅ @Binding quando:
+// - View precisa de UMA propriedade apenas
+// - SEM lógica (só leitura/escrita)
+// - Componente GENÉRICO e reutilizável
+```
+
+</details>
+
+---
+
+### 🎯 Exercício 4.2: Custom Environment Values
+
+**Objetivo:** Criar seus próprios Environment Values para configuração global.
+
+**Tarefa:** Implemente um sistema de Theme customizado usando `@Environment`.
+
+Requisitos:
+- Criar um `AppTheme` com cores e configurações
+- Usar `EnvironmentKey` para registrar
+- Injetar no App
+- Acessar em views filhas
+
+```swift
+// 1. Criar o modelo do Theme
+struct AppTheme {
+    // SEU CÓDIGO AQUI
+}
+
+// 2. Criar a EnvironmentKey
+// SEU CÓDIGO AQUI
+
+// 3. Estender EnvironmentValues
+// SEU CÓDIGO AQUI
+
+// 4. Usar nas views
+struct ThemedButton: View {
+    // SEU CÓDIGO AQUI
+}
+```
+
+<details>
+<summary>💡 Solução</summary>
+
+```swift
+import SwiftUI
+
+// MARK: - 1. Modelo do Theme
+
+struct AppTheme {
+    let primaryColor: Color
+    let secondaryColor: Color
+    let backgroundColor: Color
+    let textColor: Color
+    let cornerRadius: CGFloat
+    let buttonHeight: CGFloat
+    
+    // Themes predefinidos
+    static let blue = AppTheme(
+        primaryColor: .blue,
+        secondaryColor: .cyan,
+        backgroundColor: .white,
+        textColor: .black,
+        cornerRadius: 12,
+        buttonHeight: 50
+    )
+    
+    static let purple = AppTheme(
+        primaryColor: .purple,
+        secondaryColor: .pink,
+        backgroundColor: Color(white: 0.98),
+        textColor: .black,
+        cornerRadius: 20,
+        buttonHeight: 56
+    )
+    
+    static let dark = AppTheme(
+        primaryColor: .orange,
+        secondaryColor: .yellow,
+        backgroundColor: Color(white: 0.1),
+        textColor: .white,
+        cornerRadius: 8,
+        buttonHeight: 48
+    )
+}
+
+// MARK: - 2. Criar a EnvironmentKey
+
+private struct AppThemeKey: EnvironmentKey {
+    static let defaultValue: AppTheme = .blue // Valor padrão
+}
+
+// MARK: - 3. Estender EnvironmentValues
+
+extension EnvironmentValues {
+    var appTheme: AppTheme {
+        get { self[AppThemeKey.self] }
+        set { self[AppThemeKey.self] = newValue }
+    }
+}
+
+// MARK: - 4. Componentes que usam o Theme
+
+struct ThemedButton: View {
+    @Environment(\.appTheme) var theme // ✅ Acessa o theme!
+    
+    let title: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: theme.buttonHeight) // ✅ Usa valores do theme
+                .background(theme.primaryColor)
+                .cornerRadius(theme.cornerRadius)
+        }
+    }
+}
+
+struct ThemedCard: View {
+    @Environment(\.appTheme) var theme
+    
+    let title: String
+    let content: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(theme.textColor) // ✅ Usa theme
+            
+            Text(content)
+                .font(.body)
+                .foregroundColor(theme.textColor.opacity(0.7))
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.secondaryColor.opacity(0.2)) // ✅ Usa theme
+        .cornerRadius(theme.cornerRadius)
+    }
+}
+
+// MARK: - 5. Demo View
+
+struct ThemedContentView: View {
+    @Environment(\.appTheme) var theme
+    
+    @State private var count = 0
+    
+    var body: some View {
+        ZStack {
+            // Background usa o theme
+            theme.backgroundColor
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                Text("Custom Theme Demo")
+                    .font(.largeTitle)
+                    .foregroundColor(theme.textColor)
+                
+                ThemedCard(
+                    title: "Contador",
+                    content: "Valor atual: \(count)"
+                )
+                
+                ThemedButton(title: "Incrementar") {
+                    count += 1
+                }
+                
+                ThemedButton(title: "Resetar") {
+                    count = 0
+                }
+            }
+            .padding()
+        }
+    }
+}
+
+// MARK: - 6. App com Theme Picker
+
+@main
+struct ThemedApp: App {
+    @State private var selectedTheme: AppTheme = .blue
+    
+    var body: some Scene {
+        WindowGroup {
+            NavigationView {
+                ThemedContentView()
+                    .environment(\.appTheme, selectedTheme) // ✅ Injeta o theme!
+                    .toolbar {
+                        Menu("Theme") {
+                            Button("Blue") { selectedTheme = .blue }
+                            Button("Purple") { selectedTheme = .purple }
+                            Button("Dark") { selectedTheme = .dark }
+                        }
+                    }
+            }
+        }
+    }
+}
+```
+
+**Conceitos:**
+
+1. **EnvironmentKey** define o tipo e valor padrão:
+   ```swift
+   private struct AppThemeKey: EnvironmentKey {
+       static let defaultValue: AppTheme = .blue
+   }
+   ```
+
+2. **Extension em EnvironmentValues** cria a computed property:
+   ```swift
+   extension EnvironmentValues {
+       var appTheme: AppTheme {
+           get { self[AppThemeKey.self] }
+           set { self[AppThemeKey.self] = newValue }
+       }
+   }
+   ```
+
+3. **\.appTheme** é o KeyPath que você usa:
+   ```swift
+   @Environment(\.appTheme) var theme
+   ```
+
+4. **Injeção** acontece com `.environment()`:
+   ```swift
+   .environment(\.appTheme, selectedTheme)
+   ```
+
+5. **Propagação automática** - todas as views filhas têm acesso!
+
+</details>
+
+---
+
+### 🎯 Exercício 4.3: @EnvironmentObject - Evitando Crashes
+
+**Objetivo:** Entender o perigo de @EnvironmentObject e como evitar crashes.
+
+**Tarefa:** Este código tem um problema que causa crash. Identifique e corrija de 3 formas diferentes.
+
+```swift
+// 🐛 Este código CRASHA em runtime!
+
+class UserSession: ObservableObject {
+    @Published var isLoggedIn = false
+    @Published var username = ""
+    
+    func login(username: String) {
+        self.username = username
+        self.isLoggedIn = true
+    }
+}
+
+@main
+struct MyApp: App {
+    @StateObject var session = UserSession()
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+            // 🐛 ESQUECEU ALGO AQUI!
+        }
+    }
+}
+
+struct ContentView: View {
+    var body: some View {
+        ProfileView()
+    }
+}
+
+struct ProfileView: View {
+    @EnvironmentObject var session: UserSession // 💥 CRASH!
+    
+    var body: some View {
+        VStack {
+            if session.isLoggedIn {
+                Text("Olá, \(session.username)")
+            } else {
+                Text("Não logado")
+            }
+        }
+    }
+}
+
+// Preview também crasha!
+struct ProfileView_Previews: PreviewProvider {
+    static var previews: some View {
+        ProfileView() // 💥 CRASH!
+    }
+}
+```
+
+**Solução 1: Adicione `.environmentObject()`**  
+**Solução 2: Use injeção explícita**  
+**Solução 3: Use AppContainer (DI)**
+
+<details>
+<summary>💡 Solução 1: Adicionar .environmentObject()</summary>
+
+```swift
+@main
+struct MyApp: App {
+    @StateObject var session = UserSession()
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(session) // ✅ Injeta!
+        }
+    }
+}
+
+struct ProfileView_Previews: PreviewProvider {
+    static var previews: some View {
+        ProfileView()
+            .environmentObject(UserSession()) // ✅ Mock para preview
+    }
+}
+```
+
+**Vantagens:**
+- ✅ Menos código
+- ✅ Não precisa passar por todas as views
+
+**Desvantagens:**
+- ❌ Crash em runtime se esquecer
+- ❌ Não vê dependências
+- ❌ Preview precisa lembrar de injetar
+
+</details>
+
+<details>
+<summary>💡 Solução 2: Injeção Explícita</summary>
+
+```swift
+@main
+struct MyApp: App {
+    @StateObject var session = UserSession()
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView(session: session) // ✅ Passa explicitamente
+        }
+    }
+}
+
+struct ContentView: View {
+    let session: UserSession // ✅ Parâmetro explícito
+    
+    var body: some View {
+        ProfileView(session: session) // ✅ Passa para filha
+    }
+}
+
+struct ProfileView: View {
+    @ObservedObject var session: UserSession // ✅ Recebe como parâmetro
+    
+    var body: some View {
+        VStack {
+            if session.isLoggedIn {
+                Text("Olá, \(session.username)")
+            } else {
+                Text("Não logado")
+            }
+        }
+    }
+}
+
+// Preview não crasha!
+struct ProfileView_Previews: PreviewProvider {
+    static var previews: some View {
+        ProfileView(session: UserSession()) // ✅ Passa no init
+    }
+}
+```
+
+**Vantagens:**
+- ✅ Type-safe (erro de compilação se esquecer)
+- ✅ Vê dependências no init
+- ✅ Preview simples
+- ✅ Não crasha!
+
+**Desvantagens:**
+- ❌ Mais verboso
+- ❌ Precisa passar por todas as views
+
+</details>
+
+<details>
+<summary>💡 Solução 3: AppContainer (Melhor para apps grandes)</summary>
+
+```swift
+// 1. Criar o Container
+@MainActor
+final class AppContainer {
+    static let shared = AppContainer()
+    
+    let userSession: UserSession
+    
+    private init() {
+        self.userSession = UserSession()
+    }
+}
+
+// 2. App usa o Container
+@main
+struct MyApp: App {
+    let container = AppContainer.shared
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView(session: container.userSession) // ✅ Container fornece
+        }
+    }
+}
+
+// 3. Views recebem explicitamente
+struct ContentView: View {
+    let session: UserSession
+    
+    var body: some View {
+        ProfileView(session: session)
+    }
+}
+
+struct ProfileView: View {
+    @ObservedObject var session: UserSession
+    
+    var body: some View {
+        VStack {
+            if session.isLoggedIn {
+                Text("Olá, \(session.username)")
+            } else {
+                Text("Não logado")
+            }
+        }
+    }
+}
+
+// Preview
+struct ProfileView_Previews: PreviewProvider {
+    static var previews: some View {
+        ProfileView(session: UserSession()) // ✅ Simples!
+    }
+}
+```
+
+**Vantagens:**
+- ✅ Type-safe
+- ✅ Centralizado
+- ✅ Fácil de testar (MockContainer)
+- ✅ Escalável para apps grandes
+
+**Desvantagens:**
+- ❌ Mais setup inicial
+
+</details>
+
+<details>
+<summary>📊 Comparação das 3 Soluções</summary>
+
+| Aspecto | @EnvironmentObject | Explicit Injection | AppContainer |
+|---------|-------------------|-------------------|--------------|
+| **Compile-time safety** | ❌ Não | ✅ Sim | ✅ Sim |
+| **Crash risk** | ❌ Alto | ✅ Baixo | ✅ Baixo |
+| **Verbosidade** | ✅ Baixa | ❌ Alta | ⚠️ Média |
+| **Testabilidade** | ❌ Média | ✅ Boa | ✅ Excelente |
+| **Escalabilidade** | ❌ Difícil | ⚠️ Ok | ✅ Excelente |
+| **Preview** | ❌ Precisa mock | ✅ Simples | ✅ Simples |
+| **Quando usar** | Apps pequenos | Apps médios | Apps grandes |
+
+</details>
+
+---
+
+### 🎯 Exercício 4.4: Implementar AppContainer Básico
+
+**Objetivo:** Criar um Dependency Injection Container simples.
+
+**Tarefa:** Implemente um AppContainer para um app de Notes com:
+- `NotesRepository` (salva/carrega notas)
+- `NotesViewModel` (gerencia estado)
+- Injeção type-safe
+
+```swift
+// 1. Domain
+struct Note: Identifiable {
+    let id: UUID
+    var title: String
+    var content: String
+}
+
+protocol NotesRepository {
+    func loadNotes() -> [Note]
+    func saveNote(_ note: Note)
+}
+
+// 2. Data - Implemente!
+class UserDefaultsNotesRepository: NotesRepository {
+    // SEU CÓDIGO AQUI
+}
+
+// 3. Presentation - Implemente!
+@MainActor
+@Observable
+class NotesViewModel {
+    // SEU CÓDIGO AQUI
+}
+
+// 4. Container - Implemente!
+@MainActor
+final class AppContainer {
+    // SEU CÓDIGO AQUI
+}
+
+// 5. App - Use o Container!
+@main
+struct NotesApp: App {
+    // SEU CÓDIGO AQUI
+}
+```
+
+<details>
+<summary>💡 Solução Completa</summary>
+
+```swift
+import SwiftUI
+import Observation
+
+// MARK: - 1. Domain Layer
+
+struct Note: Identifiable, Codable {
+    let id: UUID
+    var title: String
+    var content: String
+    var createdAt: Date
+    
+    init(id: UUID = UUID(), title: String, content: String, createdAt: Date = Date()) {
+        self.id = id
+        self.title = title
+        self.content = content
+        self.createdAt = createdAt
+    }
+}
+
+protocol NotesRepository {
+    func loadNotes() -> [Note]
+    func saveNotes(_ notes: [Note])
+}
+
+// MARK: - 2. Data Layer
+
+class UserDefaultsNotesRepository: NotesRepository {
+    private let key = "saved_notes"
+    
+    func loadNotes() -> [Note] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let notes = try? JSONDecoder().decode([Note].self, from: data) else {
+            return []
+        }
+        return notes
+    }
+    
+    func saveNotes(_ notes: [Note]) {
+        if let data = try? JSONEncoder().encode(notes) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+}
+
+// MARK: - 3. Presentation Layer
+
+@MainActor
+@Observable
+class NotesViewModel {
+    private(set) var notes: [Note] = []
+    
+    private let repository: NotesRepository
+    
+    init(repository: NotesRepository) {
+        self.repository = repository
+        loadNotes()
+    }
+    
+    func loadNotes() {
+        notes = repository.loadNotes()
+    }
+    
+    func addNote(title: String, content: String) {
+        let note = Note(title: title, content: content)
+        notes.append(note)
+        repository.saveNotes(notes)
+    }
+    
+    func deleteNote(_ note: Note) {
+        notes.removeAll { $0.id == note.id }
+        repository.saveNotes(notes)
+    }
+    
+    func updateNote(_ note: Note) {
+        if let index = notes.firstIndex(where: { $0.id == note.id }) {
+            notes[index] = note
+            repository.saveNotes(notes)
+        }
+    }
+}
+
+// MARK: - 4. Dependency Injection Container
+
+@MainActor
+final class AppContainer {
+    static let shared = AppContainer()
+    
+    // ✅ Dependências privadas (criadas uma vez)
+    private let notesRepository: NotesRepository
+    
+    private init() {
+        // ✅ Cria as dependências
+        self.notesRepository = UserDefaultsNotesRepository()
+    }
+    
+    // ✅ Factory methods (criam ViewModels)
+    func makeNotesViewModel() -> NotesViewModel {
+        NotesViewModel(repository: notesRepository)
+    }
+}
+
+// MARK: - 5. Views
+
+struct NotesListView: View {
+    var viewModel: NotesViewModel
+    
+    @State private var showingAddNote = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(viewModel.notes) { note in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(note.title)
+                            .font(.headline)
+                        Text(note.content)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .onDelete { indexSet in
+                    indexSet.forEach { index in
+                        viewModel.deleteNote(viewModel.notes[index])
+                    }
+                }
+            }
+            .navigationTitle("Notas")
+            .toolbar {
+                Button(action: { showingAddNote = true }) {
+                    Image(systemName: "plus")
+                }
+            }
+            .sheet(isPresented: $showingAddNote) {
+                AddNoteView(viewModel: viewModel)
+            }
+        }
+    }
+}
+
+struct AddNoteView: View {
+    var viewModel: NotesViewModel
+    
+    @State private var title = ""
+    @State private var content = ""
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                TextField("Título", text: $title)
+                TextEditor(text: $content)
+                    .frame(height: 200)
+            }
+            .navigationTitle("Nova Nota")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Salvar") {
+                        viewModel.addNote(title: title, content: content)
+                        dismiss()
+                    }
+                    .disabled(title.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 6. App
+
+@main
+struct NotesApp: App {
+    // ✅ Container criado no App
+    let container = AppContainer.shared
+    
+    var body: some Scene {
+        WindowGroup {
+            // ✅ Container cria o ViewModel
+            NotesListView(viewModel: container.makeNotesViewModel())
+        }
+    }
+}
+
+// MARK: - 7. Preview
+
+struct NotesListView_Previews: PreviewProvider {
+    static var previews: some View {
+        // ✅ Para testes, pode criar um MockContainer
+        let mockRepo = MockNotesRepository()
+        let viewModel = NotesViewModel(repository: mockRepo)
+        NotesListView(viewModel: viewModel)
+    }
+}
+
+// Mock para testes/previews
+class MockNotesRepository: NotesRepository {
+    var notes: [Note] = [
+        Note(title: "Nota 1", content: "Conteúdo da nota 1"),
+        Note(title: "Nota 2", content: "Conteúdo da nota 2")
+    ]
+    
+    func loadNotes() -> [Note] {
+        return notes
+    }
+    
+    func saveNotes(_ notes: [Note]) {
+        self.notes = notes
+    }
+}
+```
+
+**Conceitos do AppContainer:**
+
+1. **Singleton:** `static let shared`
+   ```swift
+   static let shared = AppContainer()
+   ```
+
+2. **Dependências Privadas:** Criadas no `init()`
+   ```swift
+   private let notesRepository: NotesRepository
+   ```
+
+3. **Factory Methods:** Criam ViewModels
+   ```swift
+   func makeNotesViewModel() -> NotesViewModel
+   ```
+
+4. **Benefits:**
+   - ✅ Type-safe (compile-time)
+   - ✅ Centralized dependency management
+   - ✅ Easy to test (MockContainer)
+   - ✅ Reuses instances (repository shared)
+
+</details>
+
+---
+
 ## Projeto Final
 
 ### 🎯 Desafio Completo: App de Filmes
@@ -1673,10 +2641,14 @@ Parabéns por completar os exercícios! 🎉
 **O que você aprendeu:**
 - ✅ Diferença entre `@State`, `@Binding`, `@StateObject`, `@ObservedObject`
 - ✅ Quando usar cada Property Wrapper
+- ✅ **@ObservedObject vs @Binding** - Decisão crítica para arquitetura
 - ✅ Comunicação Parent-Child
 - ✅ Padrão MVVM com SwiftUI
 - ✅ ViewState pattern
 - ✅ Persistência com `@AppStorage`
+- ✅ **Custom @Environment Values** - Como criar seus próprios
+- ✅ **@EnvironmentObject** - Perigos e como evitar crashes
+- ✅ **AppContainer Pattern** - Dependency Injection type-safe
 - ✅ Migração para `@Observable`
 - ✅ Debug de problemas comuns
 
