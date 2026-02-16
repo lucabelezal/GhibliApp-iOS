@@ -1923,6 +1923,299 @@ struct MyView: View {
 }
 ```
 
+---
+
+### 🤔 Como o @Environment funciona? De onde vem o `\.colorScheme`?
+
+> **Essa é uma dúvida muito comum! Vamos entender a mágica por trás.**
+
+#### Como é criado?
+
+O SwiftUI usa o protocolo `EnvironmentKey` para definir cada valor disponível:
+
+```swift
+// ✅ 1. Criar uma CHAVE (Key) conformando com EnvironmentKey
+private struct ColorSchemeKey: EnvironmentKey {
+    static let defaultValue: ColorScheme = .light // Valor padrão
+}
+
+// ✅ 2. Criar uma EXTENSÃO em EnvironmentValues para acessar
+extension EnvironmentValues {
+    var colorScheme: ColorScheme {
+        get { self[ColorSchemeKey.self] } // Lê do dicionário
+        set { self[ColorSchemeKey.self] = newValue } // Escreve no dicionário
+    }
+}
+
+// ✅ 3. Usar nas views!
+struct MyView: View {
+    @Environment(\.colorScheme) var colorScheme // ← Acessa o valor!
+    
+    var body: some View {
+        Text("Modo: \(colorScheme == .dark ? "Escuro" : "Claro")")
+    }
+}
+```
+
+#### O que está acontecendo?
+
+```
+┌─────────────────────────────────────────────────────┐
+│  @Environment(\.colorScheme) var colorScheme        │
+│                                                     │
+│  \.colorScheme ← KeyPath para EnvironmentValues     │
+│      ↓                                              │
+│  extension EnvironmentValues {                      │
+│      var colorScheme: ColorScheme { ... }           │
+│  }   ↓                                              │
+│      get { self[ColorSchemeKey.self] }              │
+│            ↓                                        │
+│  struct ColorSchemeKey: EnvironmentKey {            │
+│      static let defaultValue: ColorScheme = .light  │
+│  }                                                  │
+└─────────────────────────────────────────────────────┘
+```
+
+**Em resumo:**
+1. `\.colorScheme` é um **KeyPath** para a propriedade `colorScheme` de `EnvironmentValues`
+2. `EnvironmentValues` é um **dicionário** gerenciado pelo SwiftUI
+3. Cada chave é definida através do protocolo `EnvironmentKey`
+4. A Apple já criou dezenas de valores padrão (colorScheme, locale, dismiss, etc.)
+
+---
+
+### 🛠️ Como criar seus próprios Environment Values
+
+**Cenário:** Você quer ter um valor de "API Base URL" disponível em toda a hierarquia de views.
+
+#### Passo 1: Criar a chave (Key)
+
+```swift
+// ✅ 1. Criar a EnvironmentKey
+private struct APIBaseURLKey: EnvironmentKey {
+    static let defaultValue: String = "https://api.production.com"
+}
+```
+
+#### Passo 2: Estender EnvironmentValues
+
+```swift
+// ✅ 2. Adicionar computed property em EnvironmentValues
+extension EnvironmentValues {
+    var apiBaseURL: String {
+        get { self[APIBaseURLKey.self] }
+        set { self[APIBaseURLKey.self] = newValue }
+    }
+}
+```
+
+#### Passo 3: Usar nas views!
+
+```swift
+// ✅ 3. Injetar o valor na raiz da hierarquia
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environment(\.apiBaseURL, "https://api.staging.com") // ✅ Sobrescreve
+        }
+    }
+}
+
+// ✅ 4. Acessar em qualquer view filha
+struct SettingsView: View {
+    @Environment(\.apiBaseURL) var apiBaseURL // ✅ Acessa!
+    
+    var body: some View {
+        VStack {
+            Text("API Base URL:")
+            Text(apiBaseURL)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+```
+
+---
+
+### 💡 Exemplo Real: Custom Environment Value
+
+**Objetivo:** Ter um "Theme" customizado disponível em todo o app.
+
+```swift
+// ✅ 1. Modelo do Theme
+struct AppTheme {
+    let primaryColor: Color
+    let secondaryColor: Color
+    let cornerRadius: CGFloat
+    
+    static let blue = AppTheme(
+        primaryColor: .blue,
+        secondaryColor: .cyan,
+        cornerRadius: 12
+    )
+    
+    static let purple = AppTheme(
+        primaryColor: .purple,
+        secondaryColor: .pink,
+        cornerRadius: 20
+    )
+}
+
+// ✅ 2. Criar a chave
+private struct AppThemeKey: EnvironmentKey {
+    static let defaultValue: AppTheme = .blue // Padrão
+}
+
+// ✅ 3. Estender EnvironmentValues
+extension EnvironmentValues {
+    var appTheme: AppTheme {
+        get { self[AppThemeKey.self] }
+        set { self[AppThemeKey.self] = newValue }
+    }
+}
+
+// ✅ 4. Injetar no app
+@main
+struct MyApp: App {
+    @State private var currentTheme: AppTheme = .blue
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environment(\.appTheme, currentTheme) // ✅ Injeta
+        }
+    }
+}
+
+// ✅ 5. Usar em qualquer view
+struct ButtonView: View {
+    @Environment(\.appTheme) var theme // ✅ Acessa!
+    
+    var body: some View {
+        Button("Clique aqui") {
+            print("Botão clicado")
+        }
+        .padding()
+        .background(theme.primaryColor) // ✅ Usa valores do theme
+        .foregroundColor(.white)
+        .cornerRadius(theme.cornerRadius)
+    }
+}
+
+struct CardView: View {
+    @Environment(\.appTheme) var theme
+    
+    var body: some View {
+        VStack {
+            Text("Card")
+        }
+        .padding()
+        .background(theme.secondaryColor.opacity(0.2))
+        .cornerRadius(theme.cornerRadius)
+    }
+}
+```
+
+---
+
+### 📊 Environment Values Comuns da Apple
+
+| Key Path | Tipo | Descrição | Exemplo |
+|----------|------|-----------|---------|
+| `\.colorScheme` | `ColorScheme` | Light/Dark mode | `.light`, `.dark` |
+| `\.dismiss` | `DismissAction` | Fecha a view atual | `dismiss()` |
+| `\.locale` | `Locale` | Idioma/região | `pt_BR`, `en_US` |
+| `\.openURL` | `OpenURLAction` | Abre URLs externas | `openURL(url)` |
+| `\.scenePhase` | `ScenePhase` | Estado do app | `.active`, `.background` |
+| `\.isEnabled` | `Bool` | View está habilitada? | `true`, `false` |
+| `\.isPresented` | `Bool` | View está apresentada? | `true`, `false` |
+| `\.layoutDirection` | `LayoutDirection` | RTL/LTR | `.leftToRight`, `.rightToLeft` |
+| `\.horizontalSizeClass` | `UserInterfaceSizeClass?` | Tamanho horizontal | `.compact`, `.regular` |
+| `\.verticalSizeClass` | `UserInterfaceSizeClass?` | Tamanho vertical | `.compact`, `.regular` |
+
+---
+
+### 🎯 Quando criar Custom Environment Values?
+
+#### ✅ Use quando:
+
+```swift
+// ✅ Valor precisa estar disponível em MUITAS views
+// Exemplo: Theme, API Config, Feature Flags
+
+@Environment(\.appTheme) var theme // Dezenas de views usam
+@Environment(\.apiConfig) var config // Toda comunicação de rede
+@Environment(\.featureFlags) var flags // Várias features checam
+```
+
+#### ❌ NÃO use quando:
+
+```swift
+// ❌ Valor específico de uma feature
+// Use StateObject/ObservedObject
+
+@StateObject var viewModel = FilmsViewModel() // ✅ Melhor!
+// ao invés de:
+@Environment(\.filmsViewModel) var viewModel // ❌ Desnecessário
+
+// ❌ Valor local de uma view
+// Use @State
+
+@State private var isExpanded = false // ✅ Melhor!
+// ao invés de:
+@Environment(\.isExpanded) var isExpanded // ❌ Exagero
+```
+
+---
+
+### 🔍 Diferença: @Environment vs @EnvironmentObject
+
+| Aspecto | @Environment | @EnvironmentObject |
+|---------|--------------|-------------------|
+| **O que passa** | Valores simples (String, Bool, structs) | Classes observáveis (ObservableObject) |
+| **Como injeta** | `.environment(\.key, value)` | `.environmentObject(objeto)` |
+| **Key Path** | ✅ Usa Key Path (`\.colorScheme`) | ❌ Não usa Key Path |
+| **Tipo** | Qualquer tipo | Precisa ser `ObservableObject` |
+| **Observação** | ❌ Não observa mudanças | ✅ Observa mudanças via `@Published` |
+| **Uso comum** | Configurações, Theme, Locale | ViewModels, Serviços, Estado global |
+
+**Exemplo comparativo:**
+
+```swift
+// ✅ @Environment - valores simples/structs
+struct MyView: View {
+    @Environment(\.colorScheme) var colorScheme // Enum
+    @Environment(\.apiBaseURL) var apiURL // String
+    @Environment(\.appTheme) var theme // Struct
+    
+    var body: some View {
+        Text("Hello")
+            .foregroundColor(theme.primaryColor)
+    }
+}
+
+// ✅ @EnvironmentObject - objetos observáveis
+class UserSession: ObservableObject {
+    @Published var isAuthenticated = false
+    @Published var username = ""
+}
+
+struct MyView: View {
+    @EnvironmentObject var session: UserSession // Classe observável
+    
+    var body: some View {
+        if session.isAuthenticated {
+            Text("Bem-vindo, \(session.username)")
+        }
+    }
+}
+```
+
+---
+
 ### @EnvironmentObject - Injeção de Dependência
 
 **Conceito:** Passar um objeto pela hierarquia de views **sem passar explicitamente**.
@@ -2002,6 +2295,260 @@ struct CartView: View {
 - ❌ Crash em runtime se esquecer de injetar
 - ❌ Dificulta preview no Xcode (precisa mock)
 
+---
+
+### ⚠️ O Perigo: Esqueceu de injetar? APP CRASHA! 💥
+
+> **IMPORTANTE:** `@EnvironmentObject` NÃO é opcional! Se você esquecer de injetar, o app **crasha em runtime**.
+
+#### O que acontece quando você esquece?
+
+```swift
+// ❌ ESQUECEU de injetar o environmentObject
+@main
+struct MyApp: App {
+    @StateObject var cart = ShoppingCart()
+    
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                // ❌ ESQUECEU: .environmentObject(cart)
+        }
+    }
+}
+
+// View tenta acessar...
+struct ProductView: View {
+    @EnvironmentObject var cart: ShoppingCart // ❌ Não foi injetado!
+    
+    var body: some View {
+        Button("Adicionar") {
+            cart.addItem() // 💥 CRASH AQUI!
+        }
+    }
+}
+```
+
+**Mensagem de erro:**
+
+```
+Fatal error: No ObservableObject of type ShoppingCart found.
+A View.environmentObject(_:) for ShoppingCart may be missing 
+as an ancestor of this view.
+```
+
+**Por que crasha?**
+
+```swift
+@EnvironmentObject var cart: ShoppingCart
+//                     ↑
+//                 NÃO é opcional!
+//                 É do tipo: ShoppingCart
+//                 NÃO é: ShoppingCart?
+
+// Quando você faz:
+cart.addItem()
+//   ↑
+// SwiftUI tenta buscar o objeto no environment
+// Se NÃO encontra → Fatal Error! 💥
+```
+
+---
+
+#### ✅ Como evitar o crash?
+
+**Solução 1: Injetar corretamente**
+
+```swift
+@main
+struct MyApp: App {
+    @StateObject var cart = ShoppingCart()
+    
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                .environmentObject(cart) // ✅ Injeta!
+        }
+    }
+}
+```
+
+**Solução 2: Para Previews, use mock**
+
+```swift
+struct ProductView_Previews: PreviewProvider {
+    static var previews: some View {
+        ProductView()
+            .environmentObject(ShoppingCart()) // ✅ Mock para preview
+    }
+}
+```
+
+**Solução 3: Para testes, injete no setup**
+
+```swift
+func testProductView() {
+    let cart = ShoppingCart()
+    let view = ProductView()
+        .environmentObject(cart) // ✅ Injeta no teste
+    
+    // ... test code
+}
+```
+
+---
+
+#### 🔍 Por que não é opcional?
+
+```swift
+// ❌ Você NÃO pode fazer isso:
+@EnvironmentObject var cart: ShoppingCart?
+//                              ↑
+//                         Isso NÃO existe!
+
+// O @EnvironmentObject SEMPRE espera encontrar o objeto
+// Se não encontra = crash!
+```
+
+**Comparação com abordagem explícita:**
+
+```swift
+// ✅ EXPLÍCITO - Type-safe em compile time
+struct ProductView: View {
+    let cart: ShoppingCart // ← Compiler garante que foi passado!
+    
+    var body: some View {
+        Button("Adicionar") {
+            cart.addItem() // ✅ Sempre funciona
+        }
+    }
+}
+
+// Se esquecer de passar:
+ProductView() // ❌ ERRO DE COMPILAÇÃO!
+//          ↑
+// Missing argument for parameter 'cart' in call
+
+// Vs @EnvironmentObject:
+ProductView() // ✅ Compila...
+              // ❌ Mas crasha em runtime se não injetou!
+```
+
+---
+
+#### 🎯 Exemplo do ciclo de vida completo
+
+```swift
+// ✅ 1. Criar o objeto observável
+class UserSession: ObservableObject {
+    @Published var isLoggedIn = false
+    @Published var username = ""
+    
+    func login(username: String) {
+        self.username = username
+        self.isLoggedIn = true
+    }
+    
+    func logout() {
+        self.username = ""
+        self.isLoggedIn = false
+    }
+}
+
+// ✅ 2. Criar e injetar no App
+@main
+struct MyApp: App {
+    @StateObject var session = UserSession() // ✅ App cria e owns
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(session) // ✅ Injeta na hierarquia
+        }
+    }
+}
+
+// ✅ 3. Acessar em qualquer view filha
+struct LoginView: View {
+    @EnvironmentObject var session: UserSession // ✅ Acessa
+    @State private var username = ""
+    
+    var body: some View {
+        VStack {
+            TextField("Username", text: $username)
+            
+            Button("Login") {
+                session.login(username: username) // ✅ Funciona!
+            }
+        }
+    }
+}
+
+struct ProfileView: View {
+    @EnvironmentObject var session: UserSession // ✅ Mesmo objeto!
+    
+    var body: some View {
+        VStack {
+            Text("Olá, \(session.username)")
+            
+            Button("Logout") {
+                session.logout() // ✅ Funciona!
+            }
+        }
+    }
+}
+
+// ✅ 4. Preview precisa do mock
+struct LoginView_Previews: PreviewProvider {
+    static var previews: some View {
+        LoginView()
+            .environmentObject(UserSession()) // ✅ Mock para preview
+    }
+}
+```
+
+---
+
+#### 📊 Comparação: @EnvironmentObject vs Explicit Injection
+
+| Aspecto | @EnvironmentObject | Explicit (let cart: Cart) |
+|---------|-------------------|---------------------------|
+| **Compile-time safety** | ❌ Não | ✅ Sim |
+| **Crash se esquecer** | ❌ Sim (runtime) | ✅ Não (compile error) |
+| **Verbosidade** | ✅ Menos código | ❌ Mais código |
+| **Explícito** | ❌ Implícito | ✅ Explícito |
+| **Preview** | ❌ Precisa mock | ✅ Só passar no init |
+| **Testabilidade** | ❌ Precisa setup | ✅ Simples injeção |
+| **Refatoração** | ❌ Não vê dependências | ✅ Vê no init |
+
+**Exemplo comparativo:**
+
+```swift
+// ❌ @EnvironmentObject - não vê dependências
+struct OrderView: View {
+    @EnvironmentObject var cart: ShoppingCart
+    @EnvironmentObject var user: UserSession
+    @EnvironmentObject var analytics: AnalyticsService
+    // ↑ Não aparece no init, difícil de rastrear!
+}
+
+// ✅ Explicit - vê todas dependências
+struct OrderView: View {
+    let cart: ShoppingCart
+    let user: UserSession
+    let analytics: AnalyticsService
+    // ↑ Init mostra EXATAMENTE o que precisa!
+    
+    init(cart: ShoppingCart, user: UserSession, analytics: AnalyticsService) {
+        self.cart = cart
+        self.user = user
+        self.analytics = analytics
+    }
+}
+```
+
+---
+
 ### Por que o GhibliApp não usa?
 
 O GhibliApp usa **Dependency Injection explícita** via `AppContainer`:
@@ -2029,6 +2576,495 @@ struct RootView: View {
 - Apps pequenos (<10 telas)
 - Objetos realmente globais (User, Theme)
 - Quando quer menos código
+
+---
+
+## 🏗️ AppContainer - Dependency Injection no GhibliApp
+
+> **IMPORTANTE:** `AppContainer` **NÃO é nativo do Swift/SwiftUI!** É um **padrão de arquitetura** (Dependency Injection Container) implementado no GhibliApp.
+
+### 🤔 O que é o AppContainer?
+
+É uma **classe que centraliza a criação de todas as dependências** do app (ViewModels, UseCases, Repositories, etc.).
+
+**Problema que resolve:**
+
+```swift
+// ❌ SEM AppContainer - Cada view cria suas dependências
+struct FilmsView: View {
+    @StateObject var viewModel = FilmsViewModel(
+        fetchFilmsUseCase: FetchFilmsUseCase(
+            repository: FilmRepository(
+                client: URLSessionAdapter(
+                    baseURL: URL(string: "https://api.com")!
+                ),
+                cache: SwiftDataAdapter.shared
+            )
+        ),
+        getFavoritesUseCase: GetFavoritesUseCase(
+            repository: FavoritesRepository(
+                storage: SwiftDataAdapter.shared,
+                pendingStore: PendingChangeStore(...)
+            )
+        ),
+        // ... mais 10 linhas de dependências aninhadas! 😱
+    )
+}
+```
+
+**Problemas:**
+- ❌ Views conhecem detalhes de implementação
+- ❌ Difícil de testar (dependências hardcoded)
+- ❌ Código duplicado (cada view cria as mesmas coisas)
+- ❌ Difícil de mudar implementação
+
+---
+
+### ✅ Solução: AppContainer
+
+```swift
+// ✅ COM AppContainer - Centralizado e limpo!
+struct FilmsView: View {
+    @StateObject var viewModel: FilmsViewModel
+    
+    var body: some View {
+        // ... UI code
+    }
+}
+
+// No RootView:
+FilmsView(viewModel: container.makeFilmsViewModel())
+//                    ↑
+//                Container cria tudo internamente!
+```
+
+---
+
+### 📁 Implementação Real no GhibliApp
+
+#### 1. A classe AppContainer
+
+```swift
+// Infrastructure/DependencyInjection/AppContainer.swift
+
+@MainActor
+final class AppContainer {
+    static let shared = AppContainer() // ✅ Singleton
+    
+    // ✅ Router para navegação
+    let router: AppRouter
+    
+    // ✅ UseCases (lógica de negócio)
+    private let fetchFilmsUseCase: FetchFilmsUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+    private let getFavoritesUseCase: GetFavoritesUseCase
+    // ... mais UseCases
+    
+    private init() {
+        // ✅ Cria HTTPClient
+        let httpClient = URLSessionAdapter(
+            baseURL: AppConfiguration.ghibliAPIBaseURL
+        )
+        
+        // ✅ Cria Storage (SwiftData)
+        let storage: StorageAdapter = SwiftDataAdapter.shared
+        
+        // ✅ Cria Repositories (acesso a dados)
+        let filmRepository = FilmRepository(
+            client: httpClient,
+            cache: storage
+        )
+        let favoritesRepository = FavoritesRepository(
+            storage: storage,
+            pendingStore: PendingChangeStore(storage: storage)
+        )
+        
+        // ✅ Cria UseCases (lógica de negócio)
+        self.fetchFilmsUseCase = FetchFilmsUseCase(
+            repository: filmRepository
+        )
+        self.toggleFavoriteUseCase = ToggleFavoriteUseCase(
+            repository: favoritesRepository
+        )
+        self.getFavoritesUseCase = GetFavoritesUseCase(
+            repository: favoritesRepository
+        )
+        
+        // ✅ Cria Router
+        self.router = AppRouter()
+    }
+    
+    // ✅ Factory Methods - Criam ViewModels
+    func makeFilmsViewModel() -> FilmsViewModel {
+        FilmsViewModel(
+            fetchFilmsUseCase: fetchFilmsUseCase,
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase,
+            observeConnectivityUseCase: observeConnectivityUseCase
+        )
+    }
+    
+    func makeFilmDetailViewModel(film: Film) -> FilmDetailViewModel {
+        FilmDetailViewModel(
+            film: film,
+            fetchPeopleUseCase: fetchPeopleUseCase,
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase
+        )
+    }
+    
+    func makeFavoritesViewModel() -> FavoritesViewModel {
+        FavoritesViewModel(
+            fetchFilmsUseCase: fetchFilmsUseCase,
+            getFavoritesUseCase: getFavoritesUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase
+        )
+    }
+    
+    func makeSettingsViewModel() -> SettingsViewModel {
+        SettingsViewModel(
+            clearCacheUseCase: clearCacheUseCase,
+            clearFavoritesUseCase: clearFavoritesUseCase
+        )
+    }
+}
+```
+
+---
+
+#### 2. Como é usado no App
+
+**Passo 1: Criar o container no App**
+
+```swift
+// App/GhibliApp.swift
+
+@main
+struct GhibliApp: App {
+    @State private var container: AppContainer?
+    @State private var showSplash = true
+    
+    var body: some Scene {
+        WindowGroup {
+            if showSplash {
+                SplashView(duration: 1.0) {
+                    // ✅ Cria o container após splash
+                    container = AppContainer.shared
+                    showSplash = false
+                }
+            } else if let container {
+                // ✅ Passa o container para RootView
+                RootView(router: container.router, container: container)
+            }
+        }
+    }
+}
+```
+
+**Passo 2: RootView cria os ViewModels**
+
+```swift
+// Presentation/Navigation/RootView.swift
+
+struct RootView: View {
+    let container: AppContainer // ✅ Recebe o container
+    
+    // ✅ ViewModels criados no init
+    let filmsViewModel: FilmsViewModel
+    let favoritesViewModel: FavoritesViewModel
+    let searchViewModel: SearchViewModel
+    let settingsViewModel: SettingsViewModel
+    
+    init(router: AppRouter, container: AppContainer) {
+        self.container = container
+        
+        // ✅ Container cria todos os ViewModels!
+        self.filmsViewModel = container.makeFilmsViewModel()
+        self.favoritesViewModel = container.makeFavoritesViewModel()
+        self.searchViewModel = container.makeSearchViewModel()
+        self.settingsViewModel = container.makeSettingsViewModel()
+    }
+    
+    var body: some View {
+        TabView {
+            // ✅ Passa ViewModels prontos para as views
+            Tab("Filmes", systemImage: "film") {
+                FilmsView(viewModel: filmsViewModel)
+            }
+            
+            Tab("Favoritos", systemImage: "heart") {
+                FavoritesView(viewModel: favoritesViewModel)
+            }
+            
+            Tab("Ajustes", systemImage: "gear") {
+                SettingsView(viewModel: settingsViewModel)
+            }
+        }
+    }
+}
+```
+
+**Passo 3: Views apenas recebem ViewModels**
+
+```swift
+// Presentation/Films/FilmsView.swift
+
+struct FilmsView: View {
+    @State var viewModel: FilmsViewModel // ✅ Recebe pronto!
+    
+    var body: some View {
+        List(viewModel.films) { film in
+            FilmRow(film: film)
+        }
+        .task {
+            await viewModel.fetchFilms() // ✅ Só usa!
+        }
+    }
+}
+```
+
+---
+
+### 🎯 Por que usar AppContainer?
+
+#### ✅ Vantagem 1: Separação de Responsabilidades
+
+```swift
+// ✅ View não sabe COMO criar o ViewModel
+struct FilmsView: View {
+    @State var viewModel: FilmsViewModel
+    // ↑ Só sabe QUE precisa de um ViewModel!
+}
+
+// ✅ Container sabe COMO criar todas as dependências
+class AppContainer {
+    func makeFilmsViewModel() -> FilmsViewModel {
+        // Cria HTTPClient, Repositories, UseCases, etc.
+    }
+}
+```
+
+**Benefícios:**
+- Views focam em UI, não em construção de objetos
+- Lógica de criação centralizada
+- Fácil de testar (pode injetar mocks)
+
+---
+
+#### ✅ Vantagem 2: Reutilização de Instâncias
+
+```swift
+class AppContainer {
+    // ✅ UseCases são criados UMA vez
+    private let fetchFilmsUseCase: FetchFilmsUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+    
+    func makeFilmsViewModel() -> FilmsViewModel {
+        // ✅ Reutiliza os MESMOS UseCases!
+        FilmsViewModel(
+            fetchFilmsUseCase: fetchFilmsUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase
+        )
+    }
+    
+    func makeFavoritesViewModel() -> FavoritesViewModel {
+        // ✅ Reutiliza os MESMOS UseCases!
+        FavoritesViewModel(
+            fetchFilmsUseCase: fetchFilmsUseCase,
+            toggleFavoriteUseCase: toggleFavoriteUseCase
+        )
+    }
+}
+```
+
+**Benefícios:**
+- Economia de memória (instâncias compartilhadas)
+- Consistência (mesmo HTTPClient, mesmo Storage)
+- Controle de ciclo de vida centralizado
+
+---
+
+#### ✅ Vantagem 3: Facilita Testes
+
+```swift
+// ✅ Para testes, crie um MockContainer
+class MockAppContainer {
+    func makeFilmsViewModel() -> FilmsViewModel {
+        // ✅ Usa mocks ao invés de implementação real!
+        let mockUseCase = MockFetchFilmsUseCase(
+            films: [
+                Film(id: "1", title: "Spirited Away"),
+                Film(id: "2", title: "Totoro")
+            ]
+        )
+        
+        return FilmsViewModel(
+            fetchFilmsUseCase: mockUseCase,
+            // ... outros mocks
+        )
+    }
+}
+
+// ✅ No teste
+func testFilmsView() {
+    let container = MockAppContainer()
+    let viewModel = container.makeFilmsViewModel()
+    let view = FilmsView(viewModel: viewModel)
+    
+    // ✅ Testa com dados controlados!
+}
+```
+
+---
+
+#### ✅ Vantagem 4: Fácil de Trocar Implementação
+
+```swift
+class AppContainer {
+    private init() {
+        // ✅ Trocar de URLSession para Alamofire? Um lugar só!
+        let httpClient: HTTPClient = URLSessionAdapter(...)
+        // Para trocar:
+        // let httpClient: HTTPClient = AlamofireAdapter(...)
+        
+        // ✅ Trocar de SwiftData para CoreData? Um lugar só!
+        let storage: StorageAdapter = SwiftDataAdapter.shared
+        // Para trocar:
+        // let storage: StorageAdapter = CoreDataAdapter.shared
+        
+        // Todas as views continuam funcionando! 🎉
+    }
+}
+```
+
+---
+
+### 📊 Comparação: AppContainer vs @EnvironmentObject
+
+| Aspecto | AppContainer | @EnvironmentObject |
+|---------|--------------|-------------------|
+| **Nativo do Swift?** | ❌ Padrão de design | ✅ Recurso do SwiftUI |
+| **Compile-time safety** | ✅ Sim | ❌ Não (runtime) |
+| **Explícito** | ✅ Vê dependências no init | ❌ Implícito |
+| **Testabilidade** | ✅ Fácil (injeta mocks) | ❌ Precisa setup |
+| **Crash se esquecer** | ✅ Erro de compilação | ❌ Crash em runtime |
+| **Previews** | ✅ Simples | ❌ Precisa mock |
+| **Verbosidade** | ❌ Mais código | ✅ Menos código |
+| **Escalabilidade** | ✅ Ótimo para apps grandes | ❌ Complicado com muitas dependências |
+| **Ciclo de vida** | ✅ Controle total | ❌ Gerenciado pelo SwiftUI |
+
+---
+
+### 🛠️ Como implementar seu próprio AppContainer
+
+**Passo 1: Criar a classe**
+
+```swift
+@MainActor
+final class AppContainer {
+    static let shared = AppContainer()
+    
+    // Dependências compartilhadas
+    private let apiClient: APIClient
+    private let database: Database
+    
+    private init() {
+        // Inicializa dependências
+        self.apiClient = URLSession.shared
+        self.database = Database()
+    }
+    
+    // Factory methods
+    func makeHomeViewModel() -> HomeViewModel {
+        HomeViewModel(apiClient: apiClient, database: database)
+    }
+    
+    func makeProfileViewModel() -> ProfileViewModel {
+        ProfileViewModel(database: database)
+    }
+}
+```
+
+**Passo 2: Usar no App**
+
+```swift
+@main
+struct MyApp: App {
+    let container = AppContainer.shared
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView(
+                homeVM: container.makeHomeViewModel(),
+                profileVM: container.makeProfileViewModel()
+            )
+        }
+    }
+}
+```
+
+**Passo 3: Views recebem ViewModels**
+
+```swift
+struct ContentView: View {
+    @State var homeVM: HomeViewModel
+    @State var profileVM: ProfileViewModel
+    
+    var body: some View {
+        TabView {
+            HomeView(viewModel: homeVM)
+            ProfileView(viewModel: profileVM)
+        }
+    }
+}
+```
+
+---
+
+### 💡 Resumo
+
+```
+┌─────────────────────────────────────────────────┐
+│              O que é AppContainer?              │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  ❌ NÃO é nativo do Swift                       │
+│  ✅ É um PADRÃO de arquitetura                  │
+│  ✅ Dependency Injection Container              │
+│                                                 │
+│  ┌───────────────────────────────────────────┐ │
+│  │         AppContainer (Singleton)          │ │
+│  ├───────────────────────────────────────────┤ │
+│  │                                           │ │
+│  │  Cria e gerencia:                         │ │
+│  │  • HTTPClient                             │ │
+│  │  • Storage (SwiftData/CoreData)           │ │
+│  │  • Repositories                           │ │
+│  │  • UseCases                               │ │
+│  │  • ViewModels                             │ │
+│  │                                           │ │
+│  │  ✅ Um lugar centralizado                 │ │
+│  │  ✅ Reutiliza instâncias                  │ │
+│  │  ✅ Fácil de testar                       │ │
+│  │  ✅ Type-safe                             │ │
+│  │                                           │ │
+│  └───────────────────────────────────────────┘ │
+│                                                 │
+└─────────────────────────────────────────────────┘
+```
+
+**Quando usar AppContainer?**
+- ✅ Apps médios/grandes
+- ✅ Arquitetura Clean/MVVM
+- ✅ Muitas dependências
+- ✅ Quer type-safety
+- ✅ Testes são prioridade
+
+**Quando usar @EnvironmentObject?**
+- ✅ Apps pequenos
+- ✅ Poucas dependências
+- ✅ Quer menos código
+- ✅ Não precisa de testes complexos
 
 ---
 
