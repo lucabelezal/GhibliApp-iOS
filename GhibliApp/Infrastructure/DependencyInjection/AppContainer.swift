@@ -2,141 +2,185 @@ import Foundation
 
 @MainActor
 final class AppContainer {
-    static let shared = AppContainer()
+	static let shared = AppContainer()
 
-    let router: AppRouter
-    private let fetchFilmsUseCase: FetchFilmsUseCase
-    private let fetchPeopleUseCase: FetchPeopleUseCase
-    private let fetchLocationsUseCase: FetchLocationsUseCase
-    private let fetchSpeciesUseCase: FetchSpeciesUseCase
-    private let fetchVehiclesUseCase: FetchVehiclesUseCase
-    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
-    private let getFavoritesUseCase: GetFavoritesUseCase
-    private let clearFavoritesUseCase: ClearFavoritesUseCase
-    private let clearCacheUseCase: ClearCacheUseCase
-    private let observeConnectivityUseCase: ObserveConnectivityUseCase
-    private let syncManager: SyncManager
-    private var syncStartTask: Task<Void, Never>?
+	let router: AppRouter
+	private let fetchFilmsUseCase: FetchFilmsUseCase
+	private let fetchPeopleUseCase: FetchPeopleUseCase
+	private let fetchLocationsUseCase: FetchLocationsUseCase
+	private let fetchSpeciesUseCase: FetchSpeciesUseCase
+	private let fetchVehiclesUseCase: FetchVehiclesUseCase
+	private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+	private let getFavoritesUseCase: GetFavoritesUseCase
+	private let clearFavoritesUseCase: ClearFavoritesUseCase
+	private let clearCacheUseCase: ClearCacheUseCase
+	private let observeConnectivityUseCase: ObserveConnectivityUseCase
+	private let syncManager: SyncManager
+	private var syncStartTask: Task<Void, Never>?
 
-    private init() {
-        let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
-        #if DEBUG
-            let httpLogger: HTTPLogger? = ConsoleHTTPLogger()
-        #else
-            let httpLogger: HTTPLogger? = nil
-        #endif
+	private struct Repositories {
+		let film: FilmRepositoryProtocol
+		let people: PeopleRepositoryProtocol
+		let locations: LocationsRepositoryProtocol
+		let species: SpeciesRepositoryProtocol
+		let vehicles: VehiclesRepositoryProtocol
+		let favorites: FavoritesRepositoryProtocol
+		let cache: CacheRepositoryProtocol
+	}
 
-          let httpClient = URLSessionAdapter(baseURL: apiBaseURL, logger: httpLogger)
+	private init() {
+		let apiBaseURL = AppConfiguration.ghibliAPIBaseURL
+		let httpClient = Self.makeHTTPClient(baseURL: apiBaseURL)
+		let storage: StorageAdapter = SwiftDataAdapter.shared
+		let pendingStore = PendingChangeStore(storage: storage)
+		let connectivityRepository: ConnectivityRepositoryProtocol = ConnectivityMonitor()
 
-              // Padrão Adapter: é possível alternar entre SwiftDataAdapter e UserDefaultsAdapter
-              // sem tocar nos Repositories, pois ambos implementam o protocolo StorageAdapter.
-              let storage: StorageAdapter = SwiftDataAdapter.shared
-              // Alternativa: let storage: StorageAdapter = UserDefaultsAdapter()
+		self.syncManager = Self.makeSyncManager(
+			connectivity: connectivityRepository,
+			pendingStore: pendingStore
+		)
 
-              let pendingStore = PendingChangeStore(storage: storage)
-              let connectivityRepository: ConnectivityRepositoryProtocol = ConnectivityMonitor()
+		let repositories = Self.makeRepositories(
+			httpClient: httpClient,
+			baseURL: apiBaseURL,
+			storage: storage,
+			pendingStore: pendingStore
+		)
 
-              // Feature flag centralizada controla a ativação da sincronização.
-              // Padrão: desabilitado (Noop). O mock só é permitido em DEBUG quando o flag estiver ativo.
-              let syncStrategy: PendingChangeSyncStrategy
-              if FeatureFlags.syncEnabled {
-                  #if DEBUG
-                  syncStrategy = MockPendingChangeSyncStrategy(behavior: .success, delaySeconds: 0)
-                  #else
-                  // Em builds não-DEBUG mantemos Noop, mesmo que o flag seja ativado por engano.
-                  syncStrategy = NoopPendingChangeSyncStrategy()
-                  #endif
-              } else {
-                  syncStrategy = NoopPendingChangeSyncStrategy()
-              }
+		self.fetchFilmsUseCase = FetchFilmsUseCase(repository: repositories.film)
+		self.fetchPeopleUseCase = FetchPeopleUseCase(repository: repositories.people)
+		self.fetchLocationsUseCase = FetchLocationsUseCase(repository: repositories.locations)
+		self.fetchSpeciesUseCase = FetchSpeciesUseCase(repository: repositories.species)
+		self.fetchVehiclesUseCase = FetchVehiclesUseCase(repository: repositories.vehicles)
+		self.toggleFavoriteUseCase = ToggleFavoriteUseCase(repository: repositories.favorites)
+		self.getFavoritesUseCase = GetFavoritesUseCase(repository: repositories.favorites)
+		self.clearFavoritesUseCase = ClearFavoritesUseCase(repository: repositories.favorites)
+		self.clearCacheUseCase = ClearCacheUseCase(repository: repositories.cache)
+		self.observeConnectivityUseCase = ObserveConnectivityUseCase(
+			repository: connectivityRepository
+		)
 
-              let syncManager = SyncManager(
-                  connectivity: connectivityRepository,
-                  pendingStore: pendingStore,
-                  strategy: syncStrategy
-              )
-              self.syncManager = syncManager
+		self.router = AppRouter()
 
-             let filmRepository: FilmRepositoryProtocol = FilmRepository(
-              client: httpClient, cache: storage)
-          let peopleRepository: PeopleRepositoryProtocol = PeopleRepository(
-            client: httpClient,
-            baseURL: apiBaseURL,
-              cache: storage)
-          let locationsRepository: LocationsRepositoryProtocol = LocationsRepository(
-              client: httpClient, cache: storage)
-          let speciesRepository: SpeciesRepositoryProtocol = SpeciesRepository(
-              client: httpClient, cache: storage)
-          let vehiclesRepository: VehiclesRepositoryProtocol = VehiclesRepository(
-              client: httpClient, cache: storage)
-          let favoritesRepository: FavoritesRepositoryProtocol = FavoritesRepository(
-              storage: storage, pendingStore: pendingStore)
-          let cacheRepository: CacheRepositoryProtocol = CacheRepository(storage: storage)
-        self.fetchFilmsUseCase = FetchFilmsUseCase(repository: filmRepository)
-        self.fetchPeopleUseCase = FetchPeopleUseCase(repository: peopleRepository)
-        self.fetchLocationsUseCase = FetchLocationsUseCase(repository: locationsRepository)
-        self.fetchSpeciesUseCase = FetchSpeciesUseCase(repository: speciesRepository)
-        self.fetchVehiclesUseCase = FetchVehiclesUseCase(repository: vehiclesRepository)
-        self.toggleFavoriteUseCase = ToggleFavoriteUseCase(repository: favoritesRepository)
-        self.getFavoritesUseCase = GetFavoritesUseCase(repository: favoritesRepository)
-        self.clearFavoritesUseCase = ClearFavoritesUseCase(repository: favoritesRepository)
-        self.clearCacheUseCase = ClearCacheUseCase(repository: cacheRepository)
-        self.observeConnectivityUseCase = ObserveConnectivityUseCase(
-            repository: connectivityRepository)
+		syncStartTask = Task.detached(priority: .utility) { [syncManager] in
+			await syncManager.start()
+		}
+	}
 
-        self.router = AppRouter()
+	private static func makeHTTPClient(baseURL: String) -> HTTPClient {
+		#if DEBUG
+		let httpLogger: HTTPLogger? = ConsoleHTTPLogger()
+		#else
+		let httpLogger: HTTPLogger? = nil
+		#endif
+		return URLSessionAdapter(baseURL: baseURL, logger: httpLogger)
+	}
 
-        syncStartTask = Task.detached(priority: .utility) { [syncManager] in
-            await syncManager.start()
-        }
-    }
+	private static func makeSyncManager(
+		connectivity: ConnectivityRepositoryProtocol,
+		pendingStore: PendingChangeStore
+	) -> SyncManager {
+		let syncStrategy: PendingChangeSyncStrategy
+		if FeatureFlags.syncEnabled {
+			#if DEBUG
+			syncStrategy = MockPendingChangeSyncStrategy(behavior: .success, delaySeconds: 0)
+			#else
+			syncStrategy = NoopPendingChangeSyncStrategy()
+			#endif
+		} else {
+			syncStrategy = NoopPendingChangeSyncStrategy()
+		}
+		return SyncManager(
+			connectivity: connectivity,
+			pendingStore: pendingStore,
+			strategy: syncStrategy
+		)
+	}
 
-    deinit {
-        syncStartTask?.cancel()
-    }
+	private static func makeRepositories(
+		httpClient: HTTPClient,
+		baseURL: String,
+		storage: StorageAdapter,
+		pendingStore: PendingChangeStore
+	) -> Repositories {
+		let filmRepository: FilmRepositoryProtocol = FilmRepository(
+			client: httpClient, cache: storage
+		)
+		let peopleRepository: PeopleRepositoryProtocol = PeopleRepository(
+			client: httpClient,
+			baseURL: baseURL,
+			cache: storage
+		)
+		let locationsRepository: LocationsRepositoryProtocol = LocationsRepository(
+			client: httpClient, cache: storage
+		)
+		let speciesRepository: SpeciesRepositoryProtocol = SpeciesRepository(
+			client: httpClient, cache: storage
+		)
+		let vehiclesRepository: VehiclesRepositoryProtocol = VehiclesRepository(
+			client: httpClient, cache: storage
+		)
+		let favoritesRepository: FavoritesRepositoryProtocol = FavoritesRepository(
+			storage: storage, pendingStore: pendingStore
+		)
+		let cacheRepository: CacheRepositoryProtocol = CacheRepository(storage: storage)
+		return Repositories(
+			film: filmRepository,
+			people: peopleRepository,
+			locations: locationsRepository,
+			species: speciesRepository,
+			vehicles: vehiclesRepository,
+			favorites: favoritesRepository,
+			cache: cacheRepository
+		)
+	}
 
-    func makeFilmsViewModel() -> FilmsViewModel {
-        FilmsViewModel(
-            fetchFilmsUseCase: fetchFilmsUseCase,
-            getFavoritesUseCase: getFavoritesUseCase,
-            toggleFavoriteUseCase: toggleFavoriteUseCase,
-            observeConnectivityUseCase: observeConnectivityUseCase
-        )
-    }
+	deinit {
+		syncStartTask?.cancel()
+	}
 
-    func makeFilmDetailViewModel(film: Film) -> FilmDetailViewModel {
-        FilmDetailViewModel(
-            film: film,
-            fetchPeopleUseCase: fetchPeopleUseCase,
-            fetchLocationsUseCase: fetchLocationsUseCase,
-            fetchSpeciesUseCase: fetchSpeciesUseCase,
-            fetchVehiclesUseCase: fetchVehiclesUseCase,
-            getFavoritesUseCase: getFavoritesUseCase,
-            toggleFavoriteUseCase: toggleFavoriteUseCase
-        )
-    }
+	func makeFilmsViewModel() -> FilmsViewModel {
+		FilmsViewModel(
+			fetchFilmsUseCase: fetchFilmsUseCase,
+			getFavoritesUseCase: getFavoritesUseCase,
+			toggleFavoriteUseCase: toggleFavoriteUseCase,
+			observeConnectivityUseCase: observeConnectivityUseCase
+		)
+	}
 
-    func makeFavoritesViewModel() -> FavoritesViewModel {
-        FavoritesViewModel(
-            fetchFilmsUseCase: fetchFilmsUseCase,
-            getFavoritesUseCase: getFavoritesUseCase,
-            toggleFavoriteUseCase: toggleFavoriteUseCase
-        )
-    }
+	func makeFilmDetailViewModel(film: Film) -> FilmDetailViewModel {
+		FilmDetailViewModel(
+			film: film,
+			fetchPeopleUseCase: fetchPeopleUseCase,
+			fetchLocationsUseCase: fetchLocationsUseCase,
+			fetchSpeciesUseCase: fetchSpeciesUseCase,
+			fetchVehiclesUseCase: fetchVehiclesUseCase,
+			getFavoritesUseCase: getFavoritesUseCase,
+			toggleFavoriteUseCase: toggleFavoriteUseCase
+		)
+	}
 
-    func makeSearchViewModel() -> SearchViewModel {
-        SearchViewModel(
-            fetchFilmsUseCase: fetchFilmsUseCase,
-            getFavoritesUseCase: getFavoritesUseCase,
-            toggleFavoriteUseCase: toggleFavoriteUseCase,
-            observeConnectivityUseCase: observeConnectivityUseCase
-        )
-    }
+	func makeFavoritesViewModel() -> FavoritesViewModel {
+		FavoritesViewModel(
+			fetchFilmsUseCase: fetchFilmsUseCase,
+			getFavoritesUseCase: getFavoritesUseCase,
+			toggleFavoriteUseCase: toggleFavoriteUseCase
+		)
+	}
 
-    func makeSettingsViewModel() -> SettingsViewModel {
-        SettingsViewModel(
-            clearCacheUseCase: clearCacheUseCase,
-            clearFavoritesUseCase: clearFavoritesUseCase
-        )
-    }
+	func makeSearchViewModel() -> SearchViewModel {
+		SearchViewModel(
+			fetchFilmsUseCase: fetchFilmsUseCase,
+			getFavoritesUseCase: getFavoritesUseCase,
+			toggleFavoriteUseCase: toggleFavoriteUseCase,
+			observeConnectivityUseCase: observeConnectivityUseCase
+		)
+	}
+
+	func makeSettingsViewModel() -> SettingsViewModel {
+		SettingsViewModel(
+			clearCacheUseCase: clearCacheUseCase,
+			clearFavoritesUseCase: clearFavoritesUseCase
+		)
+	}
 }

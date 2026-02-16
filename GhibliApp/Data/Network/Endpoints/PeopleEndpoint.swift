@@ -1,20 +1,20 @@
 import Foundation
 
 public enum PeopleEndpoint: Endpoint {
-    case list
-    case detail(id: String)
+	case list
+	case detail(id: String)
 
-    public nonisolated var parameterEncoding: ParameterEncoding { .url }
-    public nonisolated var requestType: RequestType { .request }
-    public nonisolated var method: HTTPMethod { .get }
-    public nonisolated var parameters: [String: Sendable]? { nil }
-    public nonisolated var headers: [String: String]? { nil }
-    public nonisolated var queryItems: [URLQueryItem]? { nil }
+	public nonisolated var parameterEncoding: ParameterEncoding { .url }
+	public nonisolated var requestType: RequestType { .request }
+	public nonisolated var method: HTTPMethod { .get }
+	public nonisolated var parameters: [String: Sendable]? { nil }
+	public nonisolated var headers: [String: String]? { nil }
+	public nonisolated var queryItems: [URLQueryItem]? { nil }
 
-    public nonisolated var path: String {
-        switch self {
-        case .list: return "/people"
-        case .detail(let id): return "/people/\(id)"
-        }
-    }
+	public nonisolated var path: String {
+		switch self {
+		case .list: return "/people"
+		case let .detail(id): return "/people/\(id)"
+		}
+	}
 }

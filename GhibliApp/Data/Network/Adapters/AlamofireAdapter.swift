@@ -37,8 +37,8 @@ public actor AlamofireAdapter: HTTPClient {
 		let response = await request.serializingData().response
 
 		#if DEBUG
-			await logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
-			await logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
+		await logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
+		await logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
 		#endif
 
 		let result: Result<T> = handleResponse(
@@ -48,9 +48,10 @@ public actor AlamofireAdapter: HTTPClient {
 		)
 
 		switch result {
-		case .success(let value):
+		case let .success(value):
 			return value
-		case .failure(let error):
+
+		case let .failure(error):
 			throw error
 		}
 	}

@@ -1,149 +1,155 @@
 import SwiftUI
 
-
 struct FilmsView: View {
-    var viewModel: FilmsViewModel
-    let openDetail: (Film) -> Void
-    private let placeholderCount = 6
+	var viewModel: FilmsViewModel
+	let openDetail: (Film) -> Void
+	private let placeholderCount = 6
 
-    var body: some View {
-        ZStack(alignment: .top) {
-            AppBackground()
-            bodyContent
-            snackbar
-        }
-        .navigationTitle(L10n.Tabs.films)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .task { await viewModel.load() }
-        .refreshable { await viewModel.refresh() }
-    }
+	var body: some View {
+		ZStack(alignment: .top) {
+			AppBackground()
+			bodyContent
+			snackbar
+		}
+		.navigationTitle(L10n.Tabs.films)
+		.toolbarBackground(.hidden, for: .navigationBar)
+		.toolbarColorScheme(.dark, for: .navigationBar)
+		.task { await viewModel.load() }
+		.refreshable { await viewModel.refresh() }
+	}
 }
 
 // MARK: - Fillings
-private extension FilmsView {
-    var bodyContent: some View {
-        List {
-            switch viewModel.state {
-            case .idle, .loading:
-                ForEach(0..<placeholderCount, id: \.self) { index in
-                    FilmRowPlaceholder(isLast: index == placeholderCount - 1)
-                }
-            case .refreshing(let content), .loaded(let content):
-                filmsList(for: content)
-            case .empty:
-                EmptyStateView(
-                    title: L10n.Films.Empty.title,
-                    subtitle: L10n.Films.Empty.subtitle,
-                    fullScreen: true
-                )
-                .padding(.top, 24)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            case .error(let error):
-                ErrorView(
-                    message: error.message,
-                    retryTitle: L10n.Films.retry,
-                    retry: { Task { await viewModel.load(forceRefresh: true) } },
-                    fullScreen: true
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .overlay(alignment: .top) {
-            if case .refreshing = viewModel.state {
-                ProgressView()
-                    .padding()
-                    .background(.thinMaterial, in: Capsule())
-                    .padding(.top, 8)
-            }
-        }
-    }
 
-    @ViewBuilder
-    func filmsList(for content: FilmsViewContent) -> some View {
-        if content.isOffline {
-            Text(L10n.Films.offlineBanner)
-                .font(.footnote)
-                .padding(8)
-                .glassBackground(cornerRadius: 16)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-        }
+extension FilmsView {
+	private var bodyContent: some View {
+		List {
+			switch viewModel.state {
+			case .idle,
+				 .loading:
+				ForEach(0 ..< placeholderCount, id: \.self) { index in
+					FilmRowPlaceholder(isLast: index == placeholderCount - 1)
+				}
+			case let .refreshing(content),
+				 let .loaded(content):
+				filmsList(for: content)
 
-        ForEach(content.items) { item in
-            VStack(spacing: 0) {
-                Button {
-                    openDetail(item.film)
-                } label: {
-                    FilmRowView(
-                        film: item.film,
-                        isFavorite: item.isFavorite,
-                        onToggleFavorite: { Task { await viewModel.toggleFavorite(item.film) } }
-                    )
-                    .filmRowStyle()
-                }
-                .buttonStyle(.plain)
+			case .empty:
+				EmptyStateView(
+					title: L10n.Films.Empty.title,
+					subtitle: L10n.Films.Empty.subtitle,
+					fullScreen: true
+				)
+				.padding(.top, 24)
+				.listRowSeparator(.hidden)
+				.listRowBackground(Color.clear)
 
-                if item.id != content.items.last?.id {
-                    Divider()
-                }
-            }
-            .listRowSeparator(.hidden)
-            .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
-            .listRowBackground(Color.clear)
-        }
-    }
+			case let .error(error):
+				ErrorView(
+					message: error.message,
+					retryTitle: L10n.Films.retry,
+					retry: { Task { await viewModel.load(forceRefresh: true) } },
+					fullScreen: true
+				)
+				.listRowSeparator(.hidden)
+				.listRowBackground(Color.clear)
+			}
+		}
+		.listStyle(.plain)
+		.scrollContentBackground(.hidden)
+		.overlay(alignment: .top) {
+			if case .refreshing = viewModel.state {
+				ProgressView()
+					.padding()
+					.background(.thinMaterial, in: Capsule())
+					.padding(.top, 8)
+			}
+		}
+	}
 
-    @ViewBuilder
-    var snackbar: some View {
-        if let snackbarState = viewModel.currentContent?.snackbar {
-            VStack {
-                ConnectivityBanner(state: snackbarState) {
-                    viewModel.dismissSnackbar()
-                }
-                .padding()
-                Spacer()
-            }
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(.spring(), value: snackbarState)
-        }
-    }
+	@ViewBuilder
+	private func filmsList(for content: FilmsViewContent) -> some View {
+		if content.isOffline {
+			Text(L10n.Films.offlineBanner)
+				.font(.footnote)
+				.padding(8)
+				.glassBackground(cornerRadius: 16)
+				.listRowSeparator(.hidden)
+				.listRowBackground(Color.clear)
+		}
+
+		ForEach(content.items) { item in
+			VStack(spacing: 0) {
+				Button {
+					openDetail(item.film)
+				} label: {
+					FilmRowView(
+						film: item.film,
+						isFavorite: item.isFavorite,
+						onToggleFavorite: { Task { await viewModel.toggleFavorite(item.film) } }
+					)
+					.filmRowStyle()
+				}
+				.buttonStyle(.plain)
+
+				if item.id != content.items.last?.id {
+					Divider()
+				}
+			}
+			.listRowSeparator(.hidden)
+			.listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+			.listRowBackground(Color.clear)
+		}
+	}
+
+	@ViewBuilder
+	private var snackbar: some View {
+		if let snackbarState = viewModel.currentContent?.snackbar {
+			VStack {
+				ConnectivityBanner(state: snackbarState) {
+					viewModel.dismissSnackbar()
+				}
+				.padding()
+				Spacer()
+			}
+			.transition(.move(edge: .top).combined(with: .opacity))
+			.animation(.spring(), value: snackbarState)
+		}
+	}
 }
 
 // MARK: - Extras
+
 private struct FilmRowPlaceholder: View {
-    let isLast: Bool
+	let isLast: Bool
 
-    var body: some View {
-        VStack(spacing: 0) {
-            FilmRowPlaceholderView()
-                .filmRowStyle()
+	var body: some View {
+		VStack(spacing: 0) {
+			FilmRowPlaceholderView()
+				.filmRowStyle()
 
-            if !isLast {
-                Divider()
-            }
-        }
-        .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
-    }
+			if !isLast {
+				Divider()
+			}
+		}
+		.listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+		.listRowSeparator(.hidden)
+		.listRowBackground(Color.clear)
+	}
 }
 
 // MARK: - ViewModifiers
+
 private struct FilmRowStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.vertical, 16)
-            .padding(.horizontal, 16)
-    }
+	func body(content: Content) -> some View {
+		content
+			.padding(.vertical, 16)
+			.padding(.horizontal, 16)
+	}
 }
 
-private extension View {
-    func filmRowStyle() -> some View {
-        modifier(FilmRowStyle())
-    }
+extension View {
+	fileprivate func filmRowStyle() -> some View {
+		modifier(FilmRowStyle())
+	}
 }

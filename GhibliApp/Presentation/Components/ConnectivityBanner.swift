@@ -1,36 +1,36 @@
 import SwiftUI
 
 struct ConnectivityBanner: View {
-    enum State: Equatable {
-        case connected
-        case disconnected
-    }
+	enum State: Equatable {
+		case connected
+		case disconnected
+	}
 
-    let state: State
-    let dismiss: () -> Void
+	let state: State
+	let dismiss: () -> Void
 
-    var body: some View {
-        content
-    }
-    
-    private var content: some View {
-        HStack(spacing: 12) {
-            Image(systemName: state == .connected ? "wifi" : "wifi.exclamationmark")
-            Text(state == .connected ? L10n.Connectivity.connected : L10n.Connectivity.disconnected)
-                .font(.subheadline.weight(.semibold))
-            Spacer()
-            Button(action: dismiss) {
-                Image(systemName: "xmark")
-            }
-        }
-        .padding()
-        .foregroundStyle(.white)
-        .background(
-            state == .connected ? Color.green.opacity(0.9) : Color.red.opacity(0.9), in: Capsule()
-        )
-        .shadow(radius: 10)
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
+	var body: some View {
+		content
+	}
+
+	private var content: some View {
+		HStack(spacing: 12) {
+			Image(systemName: state == .connected ? "wifi" : "wifi.exclamationmark")
+			Text(state == .connected ? L10n.Connectivity.connected : L10n.Connectivity.disconnected)
+				.font(.subheadline.weight(.semibold))
+			Spacer()
+			Button(action: dismiss) {
+				Image(systemName: "xmark")
+			}
+		}
+		.padding()
+		.foregroundStyle(.white)
+		.background(
+			state == .connected ? Color.green.opacity(0.9) : Color.red.opacity(0.9), in: Capsule()
+		)
+		.shadow(radius: 10)
+		.transition(.move(edge: .top).combined(with: .opacity))
+	}
 }
 
 extension ConnectivityBanner.State: Sendable {}

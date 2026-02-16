@@ -4,176 +4,181 @@ import Observation
 @MainActor
 @Observable
 final class FilmsViewModel {
-    private(set) var state: ViewState<FilmsViewContent> = .idle
+	private(set) var state: ViewState<FilmsViewContent> = .idle
 
-    private let fetchFilmsUseCase: FetchFilmsUseCase
-    private let getFavoritesUseCase: GetFavoritesUseCase
-    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
-    private let observeConnectivityUseCase: ObserveConnectivityUseCase
+	private let fetchFilmsUseCase: FetchFilmsUseCase
+	private let getFavoritesUseCase: GetFavoritesUseCase
+	private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+	private let observeConnectivityUseCase: ObserveConnectivityUseCase
 
-    @ObservationIgnored
-    private var connectivityTask: Task<Void, Never>?
-    @ObservationIgnored
-    private var snackbarDismissTask: Task<Void, Never>?
+	@ObservationIgnored
+	private var connectivityTask: Task<Void, Never>?
+	@ObservationIgnored
+	private var snackbarDismissTask: Task<Void, Never>?
 
-    init(
-        fetchFilmsUseCase: FetchFilmsUseCase,
-        getFavoritesUseCase: GetFavoritesUseCase,
-        toggleFavoriteUseCase: ToggleFavoriteUseCase,
-        observeConnectivityUseCase: ObserveConnectivityUseCase
-    ) {
-        self.fetchFilmsUseCase = fetchFilmsUseCase
-        self.getFavoritesUseCase = getFavoritesUseCase
-        self.toggleFavoriteUseCase = toggleFavoriteUseCase
-        self.observeConnectivityUseCase = observeConnectivityUseCase
-        listenToConnectivity()
-    }
+	init(
+		fetchFilmsUseCase: FetchFilmsUseCase,
+		getFavoritesUseCase: GetFavoritesUseCase,
+		toggleFavoriteUseCase: ToggleFavoriteUseCase,
+		observeConnectivityUseCase: ObserveConnectivityUseCase
+	) {
+		self.fetchFilmsUseCase = fetchFilmsUseCase
+		self.getFavoritesUseCase = getFavoritesUseCase
+		self.toggleFavoriteUseCase = toggleFavoriteUseCase
+		self.observeConnectivityUseCase = observeConnectivityUseCase
+		listenToConnectivity()
+	}
 
-    @MainActor deinit {
-        connectivityTask?.cancel()
-        snackbarDismissTask?.cancel()
-    }
+	@MainActor deinit {
+		connectivityTask?.cancel()
+		snackbarDismissTask?.cancel()
+	}
 
-    func load(forceRefresh: Bool = false) async {
-        guard canStartLoading else { return }
-        state = .loading
-        await fetch(forceRefresh: forceRefresh)
-    }
+	func load(forceRefresh: Bool = false) async {
+		guard canStartLoading else { return }
+		state = .loading
+		await fetch(forceRefresh: forceRefresh)
+	}
 
-    func refresh() async {
-        if case .loaded(let content) = state {
-            state = .refreshing(content)
-            await fetch(forceRefresh: true)
-            return
-        }
+	func refresh() async {
+		if case let .loaded(content) = state {
+			state = .refreshing(content)
+			await fetch(forceRefresh: true)
+			return
+		}
 
-        await load(forceRefresh: true)
-    }
+		await load(forceRefresh: true)
+	}
 
-    func toggleFavorite(_ film: Film) async {
-        do {
-            let favorites = try await toggleFavoriteUseCase.execute(id: film.id)
-            applyFavoriteIDs(favorites)
-        } catch {
-            presentSnackbar(for: .disconnected)
-        }
-    }
+	func toggleFavorite(_ film: Film) async {
+		do {
+			let favorites = try await toggleFavoriteUseCase.execute(id: film.id)
+			applyFavoriteIDs(favorites)
+		} catch {
+			presentSnackbar(for: .disconnected)
+		}
+	}
 
-    func dismissSnackbar() {
-        guard let content = currentContent else { return }
-        replaceLoadedState(with: content.dismissingSnackbar())
-    }
+	func dismissSnackbar() {
+		guard let content = currentContent else { return }
+		replaceLoadedState(with: content.dismissingSnackbar())
+	}
 
-    var currentContent: FilmsViewContent? {
-        switch state {
-        case .loaded(let content), .refreshing(let content):
-            return content
-        default:
-            return nil
-        }
-    }
+	var currentContent: FilmsViewContent? {
+		switch state {
+		case let .loaded(content),
+			 let .refreshing(content):
+			return content
 
-    private var canStartLoading: Bool {
-        if case .loading = state { return false }
-        if case .refreshing = state { return false }
-        return true
-    }
+		default:
+			return nil
+		}
+	}
 
-    private func fetch(forceRefresh: Bool) async {
-        do {
-            async let favoritesTask = getFavoritesUseCase.execute()
-            async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: forceRefresh)
-            let favorites = try await favoritesTask
-            let films = try await filmsTask
-            let content = makeContent(films: films, favorites: favorites)
-            state = content.isEmpty ? .empty : .loaded(content)
-        } catch {
-            state = .error(.from(error))
-        }
-    }
+	private var canStartLoading: Bool {
+		if case .loading = state { return false }
+		if case .refreshing = state { return false }
+		return true
+	}
 
-    private func makeContent(films: [Film], favorites: Set<String>) -> FilmsViewContent {
-        let base = currentContent ?? .empty
-        let items = films.map { film in
-            FilmsViewContent.Item(film: film, isFavorite: favorites.contains(film.id))
-        }
-        return FilmsViewContent(items: items, isOffline: base.isOffline, snackbar: base.snackbar)
-    }
+	private func fetch(forceRefresh: Bool) async {
+		do {
+			async let favoritesTask = getFavoritesUseCase.execute()
+			async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: forceRefresh)
+			let favorites = try await favoritesTask
+			let films = try await filmsTask
+			let content = makeContent(films: films, favorites: favorites)
+			state = content.isEmpty ? .empty : .loaded(content)
+		} catch {
+			state = .error(.from(error))
+		}
+	}
 
-    private func applyFavoriteIDs(_ favoriteIDs: Set<String>) {
-        guard let content = currentContent else { return }
-        replaceLoadedState(with: content.updatingFavorites(favoriteIDs))
-    }
+	private func makeContent(films: [Film], favorites: Set<String>) -> FilmsViewContent {
+		let base = currentContent ?? .empty
+		let items = films.map { film in
+			FilmsViewContent.Item(film: film, isFavorite: favorites.contains(film.id))
+		}
+		return FilmsViewContent(items: items, isOffline: base.isOffline, snackbar: base.snackbar)
+	}
 
-    private func listenToConnectivity() {
-        connectivityTask?.cancel()
-        connectivityTask = Task { [weak self, observeConnectivityUseCase] in
-            for await isConnected in observeConnectivityUseCase.stream {
-                guard !Task.isCancelled else { break }
-                guard let self else { return }
-                self.handleConnectivityChange(isConnected: isConnected)
-            }
+	private func applyFavoriteIDs(_ favoriteIDs: Set<String>) {
+		guard let content = currentContent else { return }
+		replaceLoadedState(with: content.updatingFavorites(favoriteIDs))
+	}
 
-            if let self {
-                self.clearConnectivityTaskReference()
-            }
-        }
-    }
+	private func listenToConnectivity() {
+		connectivityTask?.cancel()
+		connectivityTask = Task { [weak self, observeConnectivityUseCase] in
+			for await isConnected in observeConnectivityUseCase.stream {
+				guard !Task.isCancelled else { break }
+				guard let self else { return }
+				self.handleConnectivityChange(isConnected: isConnected)
+			}
 
-    private func handleConnectivityChange(isConnected: Bool) {
-        guard let content = currentContent else { return }
-        let snackbarState: ConnectivityBanner.State = isConnected ? .connected : .disconnected
-        let updated = content.updatingConnectivity(isOffline: !isConnected, snackbar: snackbarState)
-        replaceLoadedState(with: updated)
-        provideFeedback(for: snackbarState)
-        scheduleSnackbarDismiss(for: snackbarState)
-    }
+			if let self {
+				self.clearConnectivityTaskReference()
+			}
+		}
+	}
 
-    private func presentSnackbar(for state: ConnectivityBanner.State) {
-        guard let content = currentContent else { return }
-        replaceLoadedState(
-            with: content.updatingConnectivity(isOffline: content.isOffline, snackbar: state)
-        )
-        provideFeedback(for: state)
-        scheduleSnackbarDismiss(for: state)
-    }
+	private func handleConnectivityChange(isConnected: Bool) {
+		guard let content = currentContent else { return }
+		let snackbarState: ConnectivityBanner.State = isConnected ? .connected : .disconnected
+		let updated = content.updatingConnectivity(isOffline: !isConnected, snackbar: snackbarState)
+		replaceLoadedState(with: updated)
+		provideFeedback(for: snackbarState)
+		scheduleSnackbarDismiss(for: snackbarState)
+	}
 
-    private func provideFeedback(for state: ConnectivityBanner.State) {
-        // Feedback tátil tratado pela camada de View usando modificador .sensoryFeedback
-    }
+	private func presentSnackbar(for state: ConnectivityBanner.State) {
+		guard let content = currentContent else { return }
+		replaceLoadedState(
+			with: content.updatingConnectivity(isOffline: content.isOffline, snackbar: state)
+		)
+		provideFeedback(for: state)
+		scheduleSnackbarDismiss(for: state)
+	}
 
-    private func scheduleSnackbarDismiss(for state: ConnectivityBanner.State) {
-        snackbarDismissTask?.cancel()
-        snackbarDismissTask = Task { [weak self] in
-            try? await Task.sleep(
-                nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000))
-            guard !Task.isCancelled, let self else { return }
-            self.dismissSnackbarIfNeeded(for: state)
-            self.clearSnackbarDismissTask()
-        }
-    }
+	private func provideFeedback(for _: ConnectivityBanner.State) {
+		// Feedback tátil tratado pela camada de View usando modificador .sensoryFeedback
+	}
 
-    private func dismissSnackbarIfNeeded(for state: ConnectivityBanner.State) {
-        guard let content = currentContent, content.snackbar == state else { return }
-        dismissSnackbar()
-    }
+	private func scheduleSnackbarDismiss(for state: ConnectivityBanner.State) {
+		snackbarDismissTask?.cancel()
+		snackbarDismissTask = Task { [weak self] in
+			try? await Task.sleep(
+				nanoseconds: UInt64(AppConstants.snackbarDuration * 1_000_000_000)
+			)
+			guard !Task.isCancelled, let self else { return }
+			self.dismissSnackbarIfNeeded(for: state)
+			self.clearSnackbarDismissTask()
+		}
+	}
 
-    private func clearConnectivityTaskReference() {
-        connectivityTask = nil
-    }
+	private func dismissSnackbarIfNeeded(for state: ConnectivityBanner.State) {
+		guard let content = currentContent, content.snackbar == state else { return }
+		dismissSnackbar()
+	}
 
-    private func clearSnackbarDismissTask() {
-        snackbarDismissTask = nil
-    }
+	private func clearConnectivityTaskReference() {
+		connectivityTask = nil
+	}
 
-    private func replaceLoadedState(with content: FilmsViewContent) {
-        switch state {
-        case .refreshing:
-            state = .refreshing(content)
-        case .loaded:
-            state = .loaded(content)
-        default:
-            state = content.isEmpty ? .empty : .loaded(content)
-        }
-    }
+	private func clearSnackbarDismissTask() {
+		snackbarDismissTask = nil
+	}
+
+	private func replaceLoadedState(with content: FilmsViewContent) {
+		switch state {
+		case .refreshing:
+			state = .refreshing(content)
+
+		case .loaded:
+			state = .loaded(content)
+
+		default:
+			state = content.isEmpty ? .empty : .loaded(content)
+		}
+	}
 }

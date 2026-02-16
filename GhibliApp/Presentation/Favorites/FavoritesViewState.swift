@@ -1,13 +1,13 @@
 import Foundation
 
 struct FavoritesViewContent: Equatable, Sendable {
-    var films: [Film]
+	var films: [Film]
 
-    var isEmpty: Bool { films.isEmpty }
+	var isEmpty: Bool { films.isEmpty }
 }
 
 extension FavoritesViewContent {
-    static var empty: FavoritesViewContent {
-        FavoritesViewContent(films: [])
-    }
+	static var empty: FavoritesViewContent {
+		FavoritesViewContent(films: [])
+	}
 }
