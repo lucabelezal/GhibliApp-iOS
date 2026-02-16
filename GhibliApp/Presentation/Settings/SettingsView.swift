@@ -39,16 +39,16 @@ struct SettingsView: View {
             bodyContent
         }
         .toolbarTitleDisplayMode(.inline)
-        .navigationTitle("Ajustes")
+        .navigationTitle(L10n.tabs.settings)
         .setAppearanceTheme()
         .alert(isPresented: resetBinding) {
             Alert(
-                title: Text("Limpar cache?"),
-                message: Text("Isso removerá os dados offline e favoritos salvos no dispositivo."),
-                primaryButton: .destructive(Text("Limpar")) {
+                title: Text(L10n.Settings.Alert.title),
+                message: Text(L10n.Settings.Alert.message),
+                primaryButton: .destructive(Text(L10n.Settings.Alert.primary)) {
                     Task { await viewModel.resetCache() }
                 },
-                secondaryButton: .cancel(Text("Cancelar")) {
+                secondaryButton: .cancel(Text(L10n.Settings.Alert.secondary)) {
                     viewModel.dismissReset()
                 }
             )
@@ -81,14 +81,14 @@ private extension SettingsView {
                 }
         case .empty:
             EmptyStateView(
-                title: "Nada para configurar",
-                subtitle: "Volte mais tarde",
+                title: L10n.Settings.empty.title,
+                subtitle: L10n.Settings.empty.subtitle,
                 fullScreen: true
             )
         case .error(let error):
             ErrorView(
                 message: error.message,
-                retryTitle: "Tentar novamente",
+                retryTitle: L10n.Settings.retry,
                 retry: { viewModel.dismissNotification() },
                 fullScreen: true
             )
@@ -115,7 +115,7 @@ private extension SettingsView {
 
     private var appearanceSection: some View {
         Section {
-            Picker("Appearance", selection: $appearanceTheme) {
+            Picker(L10n.Settings.Appearance.label, selection: $appearanceTheme) {
                 ForEach(AppearanceTheme.allCases) { theme in
                     Text(theme.rawValue.capitalized).tag(theme)
                 }
@@ -123,31 +123,31 @@ private extension SettingsView {
             .pickerStyle(.inline)
             .labelsHidden()
         } header: {
-            Text("Appearance")
+            Text(L10n.Settings.Appearance.label)
         } footer: {
-            Text("Overrides the system appearance to always use Light.")
+            Text(L10n.Settings.Appearance.footer)
         }
     }
 
     private var accountSection: some View {
-        Section("Account") {
-            TextField("Username", text: $username)
+        Section(L10n.Settings.Account.section) {
+            TextField(L10n.Settings.Account.username, text: $username)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
         }
     }
 
     private var preferencesSection: some View {
-        Section("Preferences") {
+        Section(L10n.Settings.Preferences.section) {
             Stepper(
-                "Items per page: \(itemsPerPage)", value: $itemsPerPage, in: 10...100, step: 5)
-            Toggle("Enable notifications", isOn: $notificationsEnabled)
+                L10n.Settings.Preferences.itemsPerPage(itemsPerPage), value: $itemsPerPage, in: 10...100, step: 5)
+            Toggle(L10n.Settings.Preferences.notifications, isOn: $notificationsEnabled)
         }
     }
 
     private var cacheSection: some View {
-        Section("Cache") {
-            Button("Limpar cache offline") {
+        Section(L10n.Settings.Cache.section) {
+            Button(L10n.Settings.Cache.clear) {
                 viewModel.presentReset()
             }
         }
@@ -158,7 +158,7 @@ private extension SettingsView {
             Button(role: .destructive) {
                 resetDefaults()
             } label: {
-                Text("Reset to Defaults")
+                Text(L10n.Settings.resetDefaults)
             }
         }
     }

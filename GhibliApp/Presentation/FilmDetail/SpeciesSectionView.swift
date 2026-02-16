@@ -5,9 +5,9 @@ struct SpeciesSectionView: View {
 
     var body: some View {
         FilmDetailCarouselSectionView(
-            title: "Espécies em destaque",
+            title: L10n.FilmDetail.Species.title,
             state: viewModel.state,
-            emptyMessage: "Nenhuma espécie encontrada para esse filme",
+            emptyMessage: L10n.FilmDetail.Species.empty,
             placeholderCount: 3
         ) { species in
             SpeciesCard(species: species)

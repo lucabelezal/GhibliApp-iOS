@@ -57,18 +57,18 @@ private extension FilmDetailView {
 
     var infoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            InfoRowView(label: "Director", value: viewModel.film.director)
-            InfoRowView(label: "Producer", value: viewModel.film.producer)
-            InfoRowView(label: "Release Year", value: viewModel.film.releaseYear)
-            InfoRowView(label: "Duration", value: "\(viewModel.film.duration) min")
-            InfoRowView(label: "Score", value: "\(viewModel.film.score)/100")
+            InfoRowView(label: L10n.FilmDetail.Info.directorLabel, value: viewModel.film.director)
+            InfoRowView(label: L10n.FilmDetail.Info.producerLabel, value: viewModel.film.producer)
+            InfoRowView(label: L10n.FilmDetail.Info.releaseYearLabel, value: viewModel.film.releaseYear)
+            InfoRowView(label: L10n.FilmDetail.Info.durationLabel, value: L10n.FilmDetail.Info.durationValue(String(viewModel.film.duration)))
+            InfoRowView(label: L10n.FilmDetail.Info.scoreLabel, value: L10n.FilmDetail.Info.scoreValue(String(viewModel.film.score)))
         }
         .filmDetailCardStyle()
     }
 
     var synopsisSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Synopsis")
+            Text(L10n.FilmDetail.synopsisTitle)
                 .font(.headline)
             Text(viewModel.film.synopsis)
                 .font(.body)

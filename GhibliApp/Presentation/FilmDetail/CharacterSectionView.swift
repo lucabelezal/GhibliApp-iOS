@@ -5,9 +5,9 @@ struct CharacterSectionView: View {
 
     var body: some View {
         FilmDetailCarouselSectionView(
-            title: "Personagens principais",
+            title: L10n.FilmDetail.Characters.title,
             state: viewModel.state,
-            emptyMessage: "Sem personagens listados",
+            emptyMessage: L10n.FilmDetail.Characters.empty,
             placeholderCount: 3
         ) { person in
             CharacterCard(person: person)

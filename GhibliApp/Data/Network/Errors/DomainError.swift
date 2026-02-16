@@ -9,10 +9,10 @@ public enum DomainError: Error {
 
 	public var localizedDescription: String {
 		switch self {
-		case .resourceNotFound: return "Resource not found."
-		case .couldNotParseObject: return "Can't convert the data to the object entity."
-		case .noConnectivity: return "No connection."
-		case .unexpected: return "Unexpected."
+		case .resourceNotFound: return L10n.Errors.Domain.resourceNotFound
+		case .couldNotParseObject: return L10n.Errors.Domain.couldNotParse
+		case .noConnectivity: return L10n.Errors.Domain.noConnectivity
+		case .unexpected: return L10n.Errors.Domain.unexpected
 		case let .unknown(message): return message
 		}
 	}

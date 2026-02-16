@@ -10,7 +10,7 @@ struct FavoritesView: View {
             AppBackground()
             bodyContent
         }
-        .navigationTitle("Favoritos")
+        .navigationTitle(L10n.tabs.favorites)
         .toolbarBackground(.hidden, for: .navigationBar)
         .task { await viewModel.load() }
     }
@@ -32,14 +32,14 @@ private extension FavoritesView {
             filmsList(for: content)
         case .empty:
             EmptyStateView(
-                title: "Sem favoritos",
-                subtitle: "Adicione filmes aos favoritos para vê-los aqui",
+                title: L10n.Favorites.Empty.title,
+                subtitle: L10n.Favorites.Empty.subtitle,
                 fullScreen: true
             )
         case .error(let error):
             ErrorView(
                 message: error.message,
-                retryTitle: "Recarregar",
+                retryTitle: L10n.Favorites.retry,
                 retry: { Task { await viewModel.load() } },
                 fullScreen: true
             )

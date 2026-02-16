@@ -12,7 +12,7 @@ struct FilmsView: View {
             bodyContent
             snackbar
         }
-        .navigationTitle("Filmes")
+        .navigationTitle(L10n.tabs.films)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await viewModel.load() }
@@ -33,8 +33,8 @@ private extension FilmsView {
                 filmsList(for: content)
             case .empty:
                 EmptyStateView(
-                    title: "Nada por aqui",
-                    subtitle: "Tente buscar novamente mais tarde",
+                    title: L10n.Films.empty.title,
+                    subtitle: L10n.Films.empty.subtitle,
                     fullScreen: true
                 )
                 .padding(.top, 24)
@@ -43,7 +43,7 @@ private extension FilmsView {
             case .error(let error):
                 ErrorView(
                     message: error.message,
-                    retryTitle: "Tentar novamente",
+                    retryTitle: L10n.Films.retry,
                     retry: { Task { await viewModel.load(forceRefresh: true) } },
                     fullScreen: true
                 )
@@ -66,7 +66,7 @@ private extension FilmsView {
     @ViewBuilder
     func filmsList(for content: FilmsViewContent) -> some View {
         if content.isOffline {
-            Text("Você está offline - exibindo cache")
+            Text(L10n.Films.offlineBanner)
                 .font(.footnote)
                 .padding(8)
                 .glassBackground(cornerRadius: 16)

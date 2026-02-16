@@ -16,7 +16,7 @@ struct ConnectivityBanner: View {
     private var content: some View {
         HStack(spacing: 12) {
             Image(systemName: state == .connected ? "wifi" : "wifi.exclamationmark")
-            Text(state == .connected ? "Conexão restabelecida" : "Sem conexão")
+            Text(state == .connected ? L10n.Connectivity.connected : L10n.Connectivity.disconnected)
                 .font(.subheadline.weight(.semibold))
             Spacer()
             Button(action: dismiss) {

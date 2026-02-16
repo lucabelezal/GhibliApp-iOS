@@ -9,13 +9,13 @@ struct SearchView: View {
             AppBackground()
             bodyContent
         }
-        .navigationTitle("Buscar")
+        .navigationTitle(L10n.tabs.search)
         .searchable(
             text: Binding(
                 get: { viewModel.query },
                 set: { viewModel.updateQuery($0) }
             ),
-            prompt: "Busque filmes"
+            prompt: L10n.Search.prompt
         )
     }
 }
@@ -27,8 +27,8 @@ private extension SearchView {
         switch viewModel.state {
         case .idle:
             EmptyStateView(
-                title: "Busque filmes",
-                subtitle: "Digite o nome do filme para começar",
+                title: L10n.Search.empty.title,
+                subtitle: L10n.Search.empty.subtitle,
                 fullScreen: true
             )
         case .loading:
@@ -40,8 +40,8 @@ private extension SearchView {
             resultsList(for: content)
         case .empty:
             EmptyStateView(
-                title: "Nada encontrado",
-                subtitle: "Tente outro termo",
+                title: L10n.Search.noResults.title,
+                subtitle: L10n.Search.noResults.subtitle,
                 fullScreen: true
             )
         case .error(let error):
@@ -50,7 +50,7 @@ private extension SearchView {
             } else {
                 ErrorView(
                     message: error.message,
-                    retryTitle: "Tentar novamente",
+                    retryTitle: L10n.Search.retry,
                     retry: { viewModel.updateQuery(viewModel.query) },
                     fullScreen: true
                 )
@@ -93,9 +93,9 @@ private extension SearchView {
         VStack(spacing: 16) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.largeTitle)
-            Text("Sem conexão para buscar filmes")
+            Text(L10n.Search.offline.title)
                 .multilineTextAlignment(.center)
-            Text("Quando a internet voltar, busque novamente usando o botão do teclado.")
+            Text(L10n.Search.offline.subtitle)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

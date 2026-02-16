@@ -5,9 +5,9 @@ struct LocationSectionView: View {
 
     var body: some View {
         FilmDetailCarouselSectionView(
-            title: "Locais visitados",
+            title: L10n.FilmDetail.Locations.title,
             state: viewModel.state,
-            emptyMessage: "Sem locais cadastrados para esse filme",
+            emptyMessage: L10n.FilmDetail.Locations.empty,
             placeholderCount: 3
         ) { location in
             LocationCard(location: location)

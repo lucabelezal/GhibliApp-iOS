@@ -5,9 +5,9 @@ struct VehicleSectionView: View {
 
     var body: some View {
         FilmDetailCarouselSectionView(
-            title: "Veículos e máquinas",
+            title: L10n.FilmDetail.Vehicles.title,
             state: viewModel.state,
-            emptyMessage: "Nenhum veículo listado",
+            emptyMessage: L10n.FilmDetail.Vehicles.empty,
             placeholderCount: 3
         ) { vehicle in
             VehicleCard(vehicle: vehicle)

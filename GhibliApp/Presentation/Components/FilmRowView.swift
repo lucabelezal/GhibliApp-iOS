@@ -43,7 +43,7 @@ struct FilmRowView: View {
 
                 HStack(spacing: 8) {
                     infoBlock(systemName: "calendar", text: film.releaseYear)
-                    infoBlock(systemName: "clock", text: "\(film.duration) min")
+                    infoBlock(systemName: "clock", text: L10n.FilmRow.durationValue(String(film.duration)))
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -85,7 +85,7 @@ struct FilmRowView: View {
     private var placeholder: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
             .fill(.gray.opacity(0.3))
-            .overlay(Text("Imagem\nindisponível").font(.caption).multilineTextAlignment(.center))
+            .overlay(Text(L10n.FilmRow.imageUnavailable).font(.caption).multilineTextAlignment(.center))
     }
 
     @ViewBuilder
