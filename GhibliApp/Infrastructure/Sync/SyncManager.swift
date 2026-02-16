@@ -49,8 +49,7 @@ actor SyncManager {
 	}
 
 	private func observeConnectivityAndSync() async {
-		// connectivityStream pode estar isolado; aguardamos para respeitar o actor correto.
-		let stream = await connectivity.connectivityStream
+		let stream = connectivity.connectivityStream
 		for await online in stream {
 			if Task.isCancelled {
 				break

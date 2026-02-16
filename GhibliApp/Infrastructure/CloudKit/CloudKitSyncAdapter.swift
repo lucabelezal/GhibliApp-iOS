@@ -15,6 +15,7 @@ final class CloudKitSyncAdapter: PendingChangeSyncStrategy, Sendable {
 
 	/// Inicializa com o identificador do container (ex.: "iCloud.com.seuapp").
 	/// Utilize CKContainer.default() ao ativar em producao.
+	@MainActor
 	init(containerIdentifier: String? = nil) {
 		// Protege contra ativacao acidental: o adaptador CloudKit so pode ser criado
 		// quando o sync estiver explicitamente habilitado via FeatureFlags.

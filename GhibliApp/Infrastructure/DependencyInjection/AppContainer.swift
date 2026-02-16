@@ -67,7 +67,7 @@ final class AppContainer {
 		}
 	}
 
-	private static func makeHTTPClient(baseURL: String) -> HTTPClient {
+	private static func makeHTTPClient(baseURL: URL) -> HTTPClient {
 		#if DEBUG
 		let httpLogger: HTTPLogger? = ConsoleHTTPLogger()
 		#else
@@ -99,7 +99,7 @@ final class AppContainer {
 
 	private static func makeRepositories(
 		httpClient: HTTPClient,
-		baseURL: String,
+		baseURL: URL,
 		storage: StorageAdapter,
 		pendingStore: PendingChangeStore
 	) -> Repositories {

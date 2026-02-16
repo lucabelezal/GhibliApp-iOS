@@ -25,7 +25,7 @@ public actor URLSessionAdapter: HTTPClient {
 	}
 
 	public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
-		let request = try await requestFactory.makeRequest(
+		let request = try requestFactory.makeRequest(
 			for: endpoint,
 			baseURL: baseURL,
 			baseQueryItems: baseQueryItems,
@@ -33,7 +33,7 @@ public actor URLSessionAdapter: HTTPClient {
 		)
 
 		#if DEBUG
-		await logger?.logRequest(request, endpoint: endpoint)
+		logger?.logRequest(request, endpoint: endpoint)
 		#endif
 
 		do {
@@ -45,7 +45,7 @@ public actor URLSessionAdapter: HTTPClient {
 			)
 
 			#if DEBUG
-			await logger?.logResponse(
+			logger?.logResponse(
 				response as? HTTPURLResponse, data: data, endpoint: endpoint
 			)
 			#endif

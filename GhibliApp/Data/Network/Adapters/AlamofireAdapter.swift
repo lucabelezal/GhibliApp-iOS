@@ -26,7 +26,7 @@ public actor AlamofireAdapter: HTTPClient {
 	}
 
 	public func request<T: Decodable & Sendable>(with endpoint: Endpoint) async throws -> T {
-		let urlRequest = try await requestFactory.makeRequest(
+		let urlRequest = try requestFactory.makeRequest(
 			for: endpoint,
 			baseURL: baseURL,
 			baseQueryItems: baseQueryItems,
@@ -37,8 +37,8 @@ public actor AlamofireAdapter: HTTPClient {
 		let response = await request.serializingData().response
 
 		#if DEBUG
-		await logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
-		await logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
+		logger?.logRequest(response.request?.urlRequest, endpoint: endpoint)
+		logger?.logResponse(response.response, data: response.data, endpoint: endpoint)
 		#endif
 
 		let result: Result<T> = handleResponse(

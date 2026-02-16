@@ -5,7 +5,6 @@ public protocol HTTPLogger: Sendable {
 	func logResponse(_ response: HTTPURLResponse?, data: Data?, endpoint: Endpoint)
 }
 
-@MainActor
 public final class ConsoleHTTPLogger: HTTPLogger {
 	public init() {}
 
