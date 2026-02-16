@@ -1,0 +1,134 @@
+/* Connectivity */
+"connectivity.connected" = "Conexão restabelecida";
+"connectivity.disconnected" = "Sem conexão";
+
+/* Errors - Domain */
+"errors.domain.could_not_parse" = "Não foi possível converter os dados.";
+"errors.domain.no_connectivity" = "Sem conexão.";
+"errors.domain.resource_not_found" = "Recurso não encontrado.";
+"errors.domain.unexpected" = "Erro inesperado.";
+
+/* Errors - Generic */
+"errors.generic.fallback" = "Tente novamente mais tarde.";
+"errors.generic.title" = "Algo deu errado";
+
+/* Errors - HTTP */
+"errors.http.authentication_required" = "Autenticação necessária.";
+"errors.http.bad_request" = "Requisição inválida.";
+"errors.http.broken_data" = "Os dados recebidos estão corrompidos.";
+"errors.http.could_not_find_host" = "Servidor não encontrado.";
+"errors.http.could_not_parse" = "Não foi possível converter os dados.";
+"errors.http.forbidden" = "Acesso negado.";
+"errors.http.internal_server_error" = "Erro interno do servidor.";
+"errors.http.invalid_http_response" = "HTTPURLResponse está nulo.";
+"errors.http.invalid_values_in_parameter_request" = "Valores inválidos nos parâmetros da requisição.";
+"errors.http.no_connectivity" = "Sem conexão.";
+"errors.http.resource_not_found" = "Recurso não encontrado.";
+"errors.http.unauthorized" = "Não autorizado.";
+"errors.http.unexpected" = "Erro inesperado.";
+"errors.http.url_construction_failure" = "URL inválida.";
+"errors.http.url_not_found" = "URL não encontrada.";
+
+/* Errors - Offline */
+"errors.offline.message" = "Verifique sua internet e tente novamente";
+"errors.offline.title" = "Sem conexão";
+
+/* Favorites */
+"favorites.empty.subtitle" = "Adicione filmes aos favoritos para vê-los aqui";
+"favorites.empty.title" = "Sem favoritos";
+"favorites.retry" = "Recarregar";
+"favorites.title" = "Favoritos";
+
+/* FilmDetail */
+"film_detail.synopsis_title" = "Sinopse";
+
+/* FilmDetail - Characters */
+"film_detail.characters.age" = "Idade";
+"film_detail.characters.empty" = "Sem personagens listados";
+"film_detail.characters.eyes" = "Olhos";
+"film_detail.characters.films" = "Filmes";
+"film_detail.characters.gender" = "Gênero";
+"film_detail.characters.hair" = "Cabelo";
+"film_detail.characters.title" = "Personagens principais";
+
+/* FilmDetail - Info */
+"film_detail.info.director_label" = "Diretor";
+"film_detail.info.duration_label" = "Duração";
+"film_detail.info.duration_value" = "%@ min";
+"film_detail.info.producer_label" = "Produtor";
+"film_detail.info.release_year_label" = "Ano de lançamento";
+"film_detail.info.score_label" = "Pontuação";
+"film_detail.info.score_value" = "%@/100";
+
+/* FilmDetail - Locations */
+"film_detail.locations.climate" = "Clima";
+"film_detail.locations.empty" = "Sem locais cadastrados para esse filme";
+"film_detail.locations.surface_water_value" = "%@%%";
+"film_detail.locations.terrain" = "Terreno";
+"film_detail.locations.title" = "Locais visitados";
+"film_detail.locations.water" = "Água";
+
+/* FilmDetail - Species */
+"film_detail.species.empty" = "Nenhuma espécie encontrada para esse filme";
+"film_detail.species.eyes" = "Olhos";
+"film_detail.species.hair" = "Cabelos";
+"film_detail.species.title" = "Espécies em destaque";
+
+/* FilmDetail - Vehicles */
+"film_detail.vehicles.class" = "Classe";
+"film_detail.vehicles.empty" = "Nenhum veículo listado";
+"film_detail.vehicles.length" = "Comprimento";
+"film_detail.vehicles.title" = "Veículos e máquinas";
+
+/* FilmRow */
+"film_row.duration_value" = "%@ min";
+"film_row.image_unavailable" = "Imagem\nindisponível";
+
+/* Films */
+"films.empty.subtitle" = "Tente buscar novamente mais tarde";
+"films.empty.title" = "Nada por aqui";
+"films.offline_banner" = "Você está offline - exibindo cache";
+"films.retry" = "Tentar novamente";
+"films.title" = "Filmes";
+
+/* Search */
+"search.empty.subtitle" = "Digite o nome do filme para começar";
+"search.empty.title" = "Busque filmes";
+"search.no_results.subtitle" = "Tente outro termo";
+"search.no_results.title" = "Nada encontrado";
+"search.offline.subtitle" = "Quando a internet voltar, busque novamente usando o botão do teclado.";
+"search.offline.title" = "Sem conexão para buscar filmes";
+"search.prompt" = "Busque filmes";
+"search.retry" = "Tentar novamente";
+"search.title" = "Buscar";
+
+/* Settings */
+"settings.account.section" = "Conta";
+"settings.account.username" = "Nome de usuário";
+"settings.alert.message" = "Isso removerá os dados offline e favoritos salvos no dispositivo.";
+"settings.alert.primary" = "Limpar";
+"settings.alert.secondary" = "Cancelar";
+"settings.alert.title" = "Limpar cache?";
+"settings.appearance.footer" = "Substitui a aparência do sistema para sempre usar Claro.";
+"settings.appearance.label" = "Aparência";
+"settings.appearance.option.dark" = "Escuro";
+"settings.appearance.option.light" = "Claro";
+"settings.appearance.option.system" = "Sistema";
+"settings.cache.clear" = "Limpar cache offline";
+"settings.cache.section" = "Cache";
+"settings.empty.subtitle" = "Volte mais tarde";
+"settings.empty.title" = "Nada para configurar";
+"settings.notifications.failure" = "Falha ao limpar cache";
+"settings.notifications.success" = "Cache removido com sucesso";
+"settings.preferences.items_per_page" = "Itens por página: %d";
+"settings.preferences.notifications" = "Ativar notificações";
+"settings.preferences.section" = "Preferências";
+"settings.reset_defaults" = "Restaurar padrões";
+"settings.retry" = "Tentar novamente";
+"settings.title" = "Ajustes";
+
+/* Tabs */
+"tabs.favorites" = "Favoritos";
+"tabs.films" = "Filmes";
+"tabs.search" = "Buscar";
+"tabs.settings" = "Ajustes";

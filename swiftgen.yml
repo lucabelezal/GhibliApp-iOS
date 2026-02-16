@@ -1,0 +1,6 @@
+strings:
+  inputs:
+    - GhibliApp/Resources/Localization
+  outputs:
+    - templatePath: Templates/structured-swift5.stencil
+      output: GhibliApp/Resources/Generated/Strings+L10n.swift
