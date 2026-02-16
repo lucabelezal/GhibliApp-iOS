@@ -7,6 +7,8 @@ options:
   generateEmptyDirectories: true
   groupSortPosition: top
   groupOrdering:
+    - pattern: '^GhibliApp$'
+      order: [Domain, Data, Infrastructure, Presentation, App, Utils, Resources]
     - pattern: '^.*$'
       order: [GhibliApp, GhibliAppTests, GhibliAppUITests, Docs, Scripts, Templates]
 
