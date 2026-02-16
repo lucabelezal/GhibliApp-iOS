@@ -14,16 +14,23 @@
 2. [async/await - O Básico](#asyncawait---o-básico)
 3. [Tasks - Criando Trabalho Assíncrono](#tasks---criando-trabalho-assíncrono)
 4. [@MainActor - Isolamento em UI](#mainactor---isolamento-em-ui)
-5. [actor - Protegendo Estado Mutável](#actor---protegendo-estado-mutável)
-6. [Cancelamento de Tasks](#cancelamento-de-tasks)
-7. [AsyncSequence e Streaming](#asyncsequence-e-streaming)
-8. [Debouncing com Task.sleep](#debouncing-com-tasksleep)
-9. [Memory Management](#memory-management)
-10. [Migrações - Do Antigo para o Novo](#migrações---do-antigo-para-o-novo)
-11. [🐛 Galeria de Bugs Comuns](#-galeria-de-bugs-comuns)
-12. [Padrões do GhibliApp](#padrões-do-ghibliapp)
-13. [✅ Checklist de Revisão](#-checklist-de-revisão)
-14. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
+5. [Global Actors Customizados](#global-actors-customizados)
+6. [actor - Protegendo Estado Mutável](#actor---protegendo-estado-mutável)
+7. [Data Races - O Problema que Actors Resolvem](#data-races---o-problema-que-actors-resolvem)
+8. [Arquitetura com Actors - Granularidade](#arquitetura-com-actors---granularidade)
+9. [Sendable - Garantindo Thread-Safety](#sendable---garantindo-thread-safety)
+10. [Cancelamento de Tasks](#cancelamento-de-tasks)
+11. [AsyncSequence e Streaming](#asyncsequence-e-streaming)
+12. [Debouncing com Task.sleep](#debouncing-com-tasksleep)
+13. [TaskGroup - Paralelismo Avançado](#taskgroup---paralelismo-avançado)
+14. [Threads vs Actors - Por Baixo dos Panos](#threads-vs-actors---por-baixo-dos-panos)
+15. [Memory Management](#memory-management)
+16. [Migrações - Do Antigo para o Novo](#migrações---do-antigo-para-o-novo)
+17. [🐛 Galeria de Bugs Comuns](#-galeria-de-bugs-comuns)
+18. [🎯 Problemas Comuns com Actors](#-problemas-comuns-com-actors)
+19. [Padrões do GhibliApp](#padrões-do-ghibliapp)
+20. [✅ Checklist de Revisão](#-checklist-de-revisão)
+21. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
 
 ---
 
@@ -644,6 +651,8 @@ Timeline:
 
 ### TaskGroup - Paralelismo Dinâmico
 
+> **💡 Use TaskGroup quando o número de tarefas é dinâmico (loop sobre array)**
+
 Quando você **não sabe quantas tarefas** vai precisar em compile time:
 
 ```swift
@@ -675,6 +684,460 @@ func fetchDetails(for films: [Film]) async throws -> [FilmDetail] {
 | Lista dinâmica de tarefas | `TaskGroup` |
 | Uma tarefa simples | `Task { }` |
 | Trabalho pesado, sem herdar contexto | `Task.detached { }` |
+
+---
+
+## TaskGroup - Paralelismo Avançado
+
+### TaskGroup vs ThrowingTaskGroup
+
+```swift
+// ✅ withTaskGroup - Não lança erros
+func processImages(_ images: [UIImage]) async -> [ProcessedImage] {
+    await withTaskGroup(of: ProcessedImage?.self) { group in
+        for image in images {
+            group.addTask {
+                // Não pode throw
+                return try? await process(image)
+            }
+        }
+        
+        var results: [ProcessedImage] = []
+        for await result in group {
+            if let result = result {
+                results.append(result)
+            }
+        }
+        return results
+    }
+}
+
+// ✅ withThrowingTaskGroup - Pode lançar erros
+func fetchAll(_ ids: [String]) async throws -> [Film] {
+    try await withThrowingTaskGroup(of: Film.self) { group in
+        for id in ids {
+            group.addTask {
+                try await self.fetch(id: id) // ✅ Pode throw
+            }
+        }
+        
+        var films: [Film] = []
+        for try await film in group {
+            films.append(film)
+        }
+        return films
+    }
+}
+```
+
+### Controlando Concorrência
+
+```swift
+// ⚠️ PROBLEMA: 1000 tasks simultâneas podem sobrecarregar!
+func fetchAll(_ urls: [URL]) async throws -> [Data] {
+    try await withThrowingTaskGroup(of: Data.self) { group in
+        for url in urls { // 1000 URLs = 1000 tasks! 😱
+            group.addTask {
+                try await URLSession.shared.data(from: url).0
+            }
+        }
+        // ...
+    }
+}
+
+// ✅ SOLUÇÃO: Limitar concorrência
+func fetchAll(_ urls: [URL], maxConcurrent: Int = 5) async throws -> [Data] {
+    try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+        var results: [Data?] = Array(repeating: nil, count: urls.count)
+        var index = 0
+        
+        // Inicia primeiras N tasks
+        for _ in 0..<min(maxConcurrent, urls.count) {
+            group.addTask {
+                let i = index
+                let data = try await URLSession.shared.data(from: urls[i]).0
+                return (i, data)
+            }
+            index += 1
+        }
+        
+        // Conforme terminam, adiciona novas
+        for try await (i, data) in group {
+            results[i] = data
+            
+            if index < urls.count {
+                group.addTask {
+                    let currentIndex = index
+                    let data = try await URLSession.shared.data(from: urls[currentIndex]).0
+                    return (currentIndex, data)
+                }
+                index += 1
+            }
+        }
+        
+        return results.compactMap { $0 }
+    }
+}
+```
+
+### TaskGroup com Cancelamento
+
+```swift
+// ✅ Cancelar grupo inteiro
+func search(query: String) async throws -> [Result] {
+    try await withThrowingTaskGroup(of: [Result].self) { group in
+        // Múltiplas fontes em paralelo
+        group.addTask { try await searchDatabase(query) }
+        group.addTask { try await searchAPI(query) }
+        group.addTask { try await searchCache(query) }
+        
+        var allResults: [Result] = []
+        
+        for try await results in group {
+            allResults.append(contentsOf: results)
+            
+            // ✅ Cancelar assim que tiver resultados suficientes
+            if allResults.count >= 10 {
+                group.cancelAll() // ✅ Cancela tasks restantes
+                break
+            }
+        }
+        
+        return allResults
+    }
+}
+```
+
+### TaskGroup com Prioridade
+
+```swift
+// ✅ Controlar prioridade das tasks
+func fetchImportantData() async throws {
+    try await withThrowingTaskGroup(of: Data.self) { group in
+        // Alta prioridade
+        group.addTask(priority: .high) {
+            try await fetchUserProfile()
+        }
+        
+        // Prioridade normal
+        group.addTask(priority: .medium) {
+            try await fetchSettings()
+        }
+        
+        // Baixa prioridade
+        group.addTask(priority: .low) {
+            try await fetchAnalytics()
+        }
+        
+        for try await data in group {
+            process(data)
+        }
+    }
+}
+```
+
+### 💡 Exemplo: Batch Processing
+
+```swift
+// ✅ Processar em lotes (batches)
+func processBatches<T, R>(
+    items: [T],
+    batchSize: Int,
+    process: @escaping (T) async throws -> R
+) async throws -> [R] {
+    try await withThrowingTaskGroup(of: [R].self) { group in
+        // Divide em batches
+        for batch in items.chunked(into: batchSize) {
+            group.addTask {
+                var batchResults: [R] = []
+                for item in batch {
+                    let result = try await process(item)
+                    batchResults.append(result)
+                }
+                return batchResults
+            }
+        }
+        
+        // Coleta resultados
+        var allResults: [R] = []
+        for try await batchResults in group {
+            allResults.append(contentsOf: batchResults)
+        }
+        return allResults
+    }
+}
+
+// Uso:
+let images: [UIImage] = [...]
+let processed = try await processBatches(
+    items: images,
+    batchSize: 10
+) { image in
+    return try await processImage(image)
+}
+```
+
+### TaskGroup vs async let
+
+```swift
+// ✅ async let: Conhecido em compile-time
+func loadDashboard() async throws {
+    async let profile = fetchProfile()
+    async let posts = fetchPosts()
+    async let friends = fetchFriends()
+    
+    let (p, ps, f) = try await (profile, posts, friends)
+}
+
+// ✅ TaskGroup: Dinâmico, runtime
+func loadDashboard(sections: [Section]) async throws {
+    try await withThrowingTaskGroup(of: SectionData.self) { group in
+        for section in sections { // Número desconhecido!
+            group.addTask {
+                try await fetchSection(section)
+            }
+        }
+        
+        for try await data in group {
+            display(data)
+        }
+    }
+}
+```
+
+---
+
+## Threads vs Actors - Por Baixo dos Panos
+
+### Como Actors Funcionam Internamente?
+
+> **💡 CONCEITO:** Actors NÃO criam threads! Eles usam um **executor** que gerencia um pool de threads.
+
+```
+┌────────────────────────────────────────────────────────────┐
+│              THREADING MODEL (Antes)                       │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  DispatchQueue.global().async { }                          │
+│       ↓                                                    │
+│  Cria/usa thread do pool                                   │
+│       ↓                                                    │
+│  Thread 1: ████████████ (dedicada)                         │
+│  Thread 2: ████████████ (dedicada)                         │
+│  Thread 3: ████████████ (dedicada)                         │
+│                                                            │
+│  Problema: Muitas threads = overhead!                      │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│              ACTOR MODEL (Swift Concurrency)               │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  actor MyActor { }                                         │
+│       ↓                                                    │
+│  Gerenciado por Executor                                   │
+│       ↓                                                    │
+│  Executor usa Thread Pool otimizado                        │
+│       ↓                                                    │
+│  Thread 1: ██ ActorA ██ ActorB ██ ActorA                   │
+│  Thread 2: ██ ActorC ██ ActorB ██ ActorD                   │
+│  Thread 3: ██ ActorD ██ ActorA ██ ActorC                   │
+│                                                            │
+│  Benefício: Thread reuse = eficiência! ✅                  │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Cooperative Thread Pool
+
+```swift
+// Actors compartilham thread pool cooperativamente
+
+actor ActorA {
+    func work() async {
+        print("A: start")    // Thread 1
+        await Task.sleep(...)// Thread liberada!
+        print("A: end")      // Thread 2 (pode ser diferente!)
+    }
+}
+
+actor ActorB {
+    func work() async {
+        print("B: start")    // Thread 1 (reutilizada!)
+        await Task.sleep(...)
+        print("B: end")      // Thread 3
+    }
+}
+```
+
+**O que acontece:**
+1. ActorA.work() começa no Thread 1
+2. `await Task.sleep` → Thread 1 é **liberada**
+3. ActorB.work() **reutiliza** Thread 1
+4. ActorA.work() retoma em Thread 2 (disponível)
+
+### Quantas Threads São Criadas?
+
+```swift
+// ⚠️ Mito: "Cada actor tem sua própria thread"
+// ✅ Realidade: Actors compartilham thread pool!
+
+actor Actor1 { }
+actor Actor2 { }
+actor Actor3 { }
+// ...
+actor Actor1000 { }
+
+// NÃO cria 1000 threads! 😱
+// Usa pool otimizado: ~CPU cores + overhead
+// Ex: iPhone com 6 cores = ~6-12 threads
+```
+
+### Serial Executor per Actor
+
+```swift
+actor Counter {
+    private var count = 0
+    
+    func increment() {
+        count += 1 // Sempre serializado!
+    }
+}
+
+// Múltiplas chamadas:
+await counter.increment() // Thread X
+await counter.increment() // Thread Y
+await counter.increment() // Thread Z
+
+// ✅ Sempre executam SERIALMENTE dentro do actor
+// ✅ Mas podem usar threads DIFERENTES
+```
+
+```
+Timeline do Counter actor:
+
+  0ms: increment() chega (Thread 1)
+       ├─ count = 1
+       └─ termina
+       
+ 10ms: increment() chega (Thread 2)
+       ├─ count = 2
+       └─ termina
+       
+ 20ms: increment() chega (Thread 1) ← Mesma thread!
+       ├─ count = 3
+       └─ termina
+       
+✅ Serial: Uma operação por vez
+✅ Efficient: Thread reuse
+```
+
+### Main Actor Thread
+
+```swift
+// ✅ @MainActor É ESPECIAL!
+@MainActor
+class ViewModel {
+    func update() {
+        print(Thread.current) // ✅ SEMPRE main thread!
+    }
+}
+
+// Por quê? @MainActor usa MainSerialExecutor
+// que é FIXADO no main thread do iOS!
+```
+
+### Actors vs GCD: Performance
+
+```swift
+// ❌ GCD: Context switches caros
+DispatchQueue.global().async {
+    // Trabalho 1 (Thread A)
+    DispatchQueue.main.async {
+        // UI Update (Main Thread)
+        DispatchQueue.global().async {
+            // Trabalho 2 (Thread B)
+        }
+    }
+}
+
+// Custo:
+// - 3 context switches
+// - 3 threads
+// - Overhead de dispatch
+
+// ✅ Actors: Cooperation
+actor Worker {
+    func work() async {
+        // Trabalho 1 (Thread X)
+        await MainActor.run {
+            // UI Update (Main Thread)
+        }
+        // Trabalho 2 (Thread Y ou X)
+    }
+}
+
+// Custo:
+// - 2 suspensions (mais leve!)
+// - Thread reuse
+// - Menos overhead
+```
+
+### Thread Explosion Prevention
+
+```swift
+// ❌ GCD: Thread explosion
+for i in 0..<10000 {
+    DispatchQueue.global().async {
+        // 10000 tasks em threads!
+        // Sistema cria muitas threads
+        // 💥 Overhead gigante!
+    }
+}
+
+// ✅ Swift Concurrency: Controlled
+for i in 0..<10000 {
+    Task {
+        // 10000 tasks mas pool limitado!
+        // Executor gerencia eficientemente
+        // ✅ Sem explosion!
+    }
+}
+```
+
+### 🎯 Regras de Ouro sobre Threads
+
+1. **Actors não criam threads** - usam pool compartilhado
+2. **@MainActor é fixo** - sempre main thread
+3. **Thread pode mudar** - entre suspension points
+4. **Thread-safety garantida** - pela serialização do actor
+5. **Pool otimizado** -  ~número de cores da CPU
+
+### Visualizando Thread Reuse
+
+```swift
+actor Logger {
+    func log(_ message: String) async {
+        let threadBefore = Thread.current.description
+        print("\(message) - Thread: \(threadBefore)")
+        
+        await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        let threadAfter = Thread.current.description
+        print("\(message) resumed - Thread: \(threadAfter)")
+        // ⚠️ threadBefore != threadAfter (pode ser diferente!)
+    }
+}
+
+let logger = Logger()
+await logger.log("Message 1")
+await logger.log("Message 2")
+
+// Output típico:
+// Message 1 - Thread: <NSThread: 0x123>...
+// Message 1 resumed - Thread: <NSThread: 0x456>... ← Diferente!
+// Message 2 - Thread: <NSThread: 0x123>... ← Reutilizada!
+// Message 2 resumed - Thread: <NSThread: 0x789>...
+```
 
 ### 💡 Exemplo Real: FilmsViewModel com Task
 
@@ -983,6 +1446,156 @@ final class SearchViewModel {
 3. ✅ **Debounce** com `Task.sleep`
 4. ✅ **Cancela anterior** antes de criar nova task
 5. ✅ **[weak self]** evita retain cycle
+
+---
+
+## Global Actors Customizados
+
+### O que são Global Actors?
+
+> **💡 CONCEITO:** Um **Global Actor** é um actor singleton que pode isolar código e dados em toda sua aplicação.
+
+`@MainActor` é o global actor mais conhecido, mas você pode criar seus próprios!
+
+### Por que criar Global Actors customizados?
+
+**Casos de uso:**
+- ✅ **Database access** - serializar todos acessos ao banco
+- ✅ **File system** - operações de I/O coordenadas
+- ✅ **Background processing** - trabalho pesado isolado
+- ✅ **Analytics** - eventos enviados serialmente
+
+### Como criar um Global Actor
+
+```swift
+// ✅ Global Actor para database
+@globalActor
+actor DatabaseActor {
+    static let shared = DatabaseActor()
+}
+
+// Uso:
+@DatabaseActor
+func saveToDatabase(_ data: Data) async throws {
+    // Sempre executa no DatabaseActor thread
+    await database.save(data)
+}
+
+@DatabaseActor
+class DatabaseManager {
+    // Toda classe isolada no DatabaseActor
+    private var cache: [String: Data] = [:]
+    
+    func fetch(key: String) async -> Data? {
+        return cache[key]
+    }
+}
+```
+
+### 💡 Exemplo: BackgroundProcessorActor
+
+```swift
+// ✅ Global Actor para processamento pesado
+@globalActor
+actor BackgroundProcessorActor {
+    static let shared = BackgroundProcessorActor()
+}
+
+// Uso:
+@BackgroundProcessorActor
+class ImageProcessor {
+    func process(_ image: UIImage) async -> UIImage {
+        // Processamento pesado isolado
+        // Não bloqueia main thread!
+        return processedImage
+    }
+}
+
+// Chamar de @MainActor ViewModel:
+@MainActor
+class ViewModel {
+    let processor = ImageProcessor()
+    
+    func processImage(_ image: UIImage) async {
+        // ✅ await atravessa actor boundary
+        let processed = await processor.process(image)
+        
+        // ✅ Volta automaticamente ao @MainActor
+        self.displayImage = processed
+    }
+}
+```
+
+### Global Actor vs Actor Normal
+
+| Aspecto | Global Actor | Actor Normal |
+|---------|--------------|-------------|
+| **Instância** | Singleton | Múltiplas instâncias |
+| **Uso** | `@DatabaseActor` | `actor MyActor` |
+| **Scope** | Aplicação inteira | Local |
+| **Exemplo** | `@MainActor`, `@DatabaseActor` | `URLSessionAdapter`, `SyncManager` |
+
+```swift
+// ❌ Actor normal - multiple instances
+actor Logger {
+    func log(_ message: String) { }
+}
+
+let logger1 = Logger() // Instância 1
+let logger2 = Logger() // Instância 2 (diferente!)
+
+// ✅ Global Actor - singleton
+@globalActor
+actor LoggerActor {
+    static let shared = LoggerActor()
+}
+
+@LoggerActor
+func log(_ message: String) {
+    // Sempre usa LoggerActor.shared
+}
+```
+
+### ⚠️ Quando NÃO usar Global Actor
+
+```swift
+// ❌ NÃO crie global actor para cada feature
+@globalActor actor FilmsActor { } // ❌ Muito específico!
+@globalActor actor SearchActor { } // ❌ Muito granular!
+@globalActor actor FavoritesActor { } // ❌ Desnecessário!
+
+// ✅ Use ViewModels com @MainActor
+@MainActor
+class FilmsViewModel { } // ✅ Correto!
+
+// ✅ Use actors normais para isolamento local
+actor FilmsRepository { } // ✅ Correto!
+```
+
+**Regra:**
+- ✅ Global Actor = recursos compartilhados (DB, FileSystem, Analytics)
+- ✅ @MainActor = UI
+- ✅ Actor normal = lógica de domínio, repositories, services
+
+### 💡 Exemplo Real: Padrão do GhibliApp
+
+```swift
+// ✅ GhibliApp NÃO usa global actors customizados!
+// Por quê? Não há necessidade!
+
+// UI = @MainActor (todos ViewModels)
+@MainActor class FilmsViewModel { }
+
+// Repositories = actors normais
+actor FilmsRepository { }
+
+// Services = actors normais
+public actor URLSessionAdapter { }
+
+// ✅ Simples, direto, efetivo!
+```
+
+**Lição:** Na maioria das apps iOS, `@MainActor` + actors normais são suficientes!
 
 ---
 
@@ -1313,6 +1926,1194 @@ actor PendingChangeStore {
 1. ✅ **Múltiplos acessos** de diferentes tasks
 2. ✅ **Read-modify-write** precisa ser atômico
 3. ✅ **File I/O** pode acontecer de várias threads
+
+---
+
+## Data Races - O Problema que Actors Resolvem
+
+### O que é um Data Race?
+
+> **💡 CONCEITO:** Um **data race** ocorre quando duas threads acessam a mesma memória simultaneamente, e pelo menos uma está **escrevendo**, SEM sincronização.
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    DATA RACE                               │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  Thread 1: READ  ─────┐                                   │
+│                       ├──► Memory ◄──┐                    │
+│  Thread 2: WRITE ─────┘               └──── Thread 3: READ│
+│                                                            │
+│  💥 RESULTADO: Undefined Behavior!                        │
+│     - Crash aleatório                                      │
+│     - Dados corrompidos                                    │
+│     - Bugs impossíveis de reproduzir                       │
+└────────────────────────────────────────────────────────────┘
+```
+
+### ❌ Exemplo Clássico de Data Race
+
+```swift
+// ❌ PERIGO: Data race!
+class Counter {
+    var value = 0
+    
+    func increment() {
+        value += 1  // 💥 NÃO é atômico!
+    }
+}
+
+let counter = Counter()
+
+// Thread 1:
+DispatchQueue.global().async {
+    for _ in 0..<1000 {
+        counter.increment()
+    }
+}
+
+// Thread 2:
+DispatchQueue.global().async {
+    for _ in 0..<1000 {
+        counter.increment()
+    }
+}
+
+// Esperado: 2000
+// Real: 1876, 1923, 1994, 2000 (ALEATÓRIO!) 💥
+```
+
+### Por que `value += 1` causa data race?
+
+```swift
+// value += 1 É NA VERDADE 3 OPERAÇÕES:
+
+// 1️⃣ READ
+let temp = value        // Lê valor atual
+
+// 2️⃣ MODIFY
+let newValue = temp + 1 // Incrementa
+
+// 3️⃣ WRITE
+value = newValue        // Escreve de volta
+
+// 💥 Entre essas operações, outra thread pode interferir!
+```
+
+**Timeline do Data Race:**
+
+```
+Time  Thread 1           Memory    Thread 2
+────────────────────────────────────────────────
+ 0ms  READ value         value=0
+ 1ms  temp = 0           value=0
+ 2ms                     value=0   READ value
+ 3ms                     value=0   temp = 0
+ 4ms  newValue = 1       value=0
+ 5ms  WRITE value=1      value=1
+ 6ms                     value=1   newValue = 1
+ 7ms                     value=1   WRITE value=1
+────────────────────────────────────────────────
+      Resultado: value = 1 (esperado: 2) ❌
+```
+
+### ✅ Solução 1: Locks (Antiga)
+
+```swift
+// ✅ Funciona mas verbose
+class Counter {
+    private var value = 0
+    private let lock = NSLock()
+    
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1  // ✅ Protegido
+    }
+    
+    func getValue() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value  // ✅ Protegido
+    }
+}
+
+// Problemas:
+// 1. Manual: Fácil esquecer lock
+// 2. Verbose: lock/unlock everywhere
+// 3. Deadlock: Se esquecer unlock
+// 4. Performance: Overhead de locking
+```
+
+### ✅ Solução 2: Actors (Moderna)
+
+```swift
+// ✅ Swift Actors FTW!
+actor Counter {
+    private var value = 0
+    
+    func increment() {
+        value += 1  // ✅ Automaticamente thread-safe!
+    }
+    
+    func getValue() -> Int {
+        return value  // ✅ Automaticamente thread-safe!
+    }
+}
+
+let counter = Counter()
+
+// Thread 1:
+Task {
+    for _ in 0..<1000 {
+        await counter.increment()
+    }
+}
+
+// Thread 2:
+Task {
+    for _ in 0..<1000 {
+        await counter.increment()
+    }
+}
+
+// Resultado: SEMPRE 2000 ✅
+```
+
+**Como actors previnem data races:**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              ACTOR SERIALIZATION                        │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Task 1: increment() ──┐                               │
+│                        │                               │
+│  Task 2: increment() ──┤──► Actor Queue ──► Executor  │
+│                        │    (FIFO)          (Serial)   │
+│  Task 3: getValue() ───┘                               │
+│                                                         │
+│  ✅ Uma operação por vez!                              │
+│  ✅ Sem data races!                                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 🎯 Exemplo Real: GhibliApp
+
+**Arquivo:** `GhibliApp/Data/Repositories/FilmsRepository.swift`
+
+```swift
+// ✅ Actor previne data race no cache
+actor FilmsRepository {
+    private var cachedFilms: [Film]?  // ← Estado mutável compartilhado
+    
+    func fetchAll(forceRefresh: Bool) async throws -> [Film] {
+        // Task 1 pode estar aqui
+        if !forceRefresh, let cached = cachedFilms {
+            return cached
+        }
+        
+        // Task 2 só entra quando Task 1 terminar
+        let films = try await httpClient.request(with: .films)
+        cachedFilms = films  // ✅ Thread-safe!
+        return films
+    }
+}
+```
+
+**Sem actor seria:**
+
+```swift
+// ❌ Data race potencial!
+class FilmsRepository {
+    private var cachedFilms: [Film]?
+    
+    func fetchAll(forceRefresh: Bool) async throws -> [Film] {
+        // 💥 Task 1 e Task 2 acessando simultaneamente!
+        if !forceRefresh, let cached = cachedFilms {
+            return cached
+        }
+        
+        let films = try await httpClient.request(with: .films)
+        cachedFilms = films  // 💥 Data race aqui!
+        return films
+    }
+}
+
+// Cenário problema:
+// Task 1: Lê cachedFilms (nil) ─────────────────┐
+// Task 2: Lê cachedFilms (nil) ──────┐          │
+//                                     │          │
+// Task 1: Escreve cachedFilms ←──────┘          │
+// Task 2: Escreve cachedFilms ←─────────────────┘
+// 💥 Última escrita vence, pode perder dados!
+```
+
+### Detectando Data Races: Thread Sanitizer
+
+**Xcode tem ferramenta built-in!**
+
+```
+Product > Scheme > Edit Scheme > Run > Diagnostics
+✅ Thread Sanitizer
+```
+
+**O que Thread Sanitizer detecta:**
+
+```swift
+// Código com data race:
+class Storage {
+    var items: [String] = []
+}
+
+let storage = Storage()
+
+Task {
+    storage.items.append("Item 1")  // Thread A
+}
+
+Task {
+    storage.items.append("Item 2")  // Thread B
+}
+
+// Thread Sanitizer output:
+// ⚠️ WARNING: ThreadSanitizer: data race
+// Write of size 8 at 0x7b0400001234
+//   #0 Storage.items.append
+// Previous write of size 8 at 0x7b0400001234
+//   #0 Storage.items.append
+// 💥 Data race detected!
+```
+
+### Tipos de Data Races Comuns
+
+#### 1. Array/Dictionary Mutation
+
+```swift
+// ❌ Data race
+class Cache {
+    var items: [String: Data] = [:]
+}
+
+let cache = Cache()
+
+Task {
+    cache.items["key1"] = data1  // Thread A
+}
+
+Task {
+    cache.items["key2"] = data2  // Thread B
+}
+
+// 💥 Dictionary não é thread-safe!
+
+// ✅ Solução: actor
+actor Cache {
+    private var items: [String: Data] = [:]
+    
+    func set(_ key: String, _ data: Data) {
+        items[key] = data  // ✅ Thread-safe!
+    }
+}
+```
+
+#### 2. Property Read-Write
+
+```swift
+// ❌ Data race
+@MainActor
+class ViewModel {
+    var isLoading = false
+    
+    func load() {
+        Task.detached {  // ⚠️ Detached não herda @MainActor!
+            self.isLoading = true  // 💥 Data race!
+            await doWork()
+            self.isLoading = false  // 💥 Data race!
+        }
+    }
+}
+
+// ✅ Solução: Task normal (herda contexto)
+@MainActor
+class ViewModel {
+    var isLoading = false
+    
+    func load() {
+        Task {  // ✅ Herda @MainActor
+            self.isLoading = true  // ✅ Thread-safe!
+            await doWork()
+            self.isLoading = false  // ✅ Thread-safe!
+        }
+    }
+}
+```
+
+#### 3. Lazy Property
+
+```swift
+// ❌ Data race
+class Service {
+    lazy var client: HTTPClient = {
+        return HTTPClient()
+    }()
+}
+
+let service = Service()
+
+Task {
+    _ = service.client  // Thread A inicializa
+}
+
+Task {
+    _ = service.client  // Thread B inicializa também!
+}
+
+// 💥 lazy não é thread-safe!
+
+// ✅ Solução 1: actor
+actor Service {
+    lazy var client: HTTPClient = HTTPClient()  // ✅ Actor protege
+}
+
+// ✅ Solução 2: let + async init
+actor Service {
+    let client: HTTPClient
+    
+    init() async {
+        self.client = await HTTPClient.create()
+    }
+}
+```
+
+#### 4. Static Variables
+
+```swift
+// ❌ Data race
+class AppState {
+    static var shared: AppState?
+    
+    static func initialize() {
+        shared = AppState()  // 💥 Data race se chamado de múltiplas threads!
+    }
+}
+
+// ✅ Solução: let (inicializado apenas uma vez)
+class AppState {
+    static let shared = AppState()  // ✅ Thread-safe!
+}
+
+// ✅ Ou use dispatch_once pattern:
+class AppState {
+    private static var _shared: AppState?
+    private static let lock = NSLock()
+    
+    static var shared: AppState {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        if _shared == nil {
+            _shared = AppState()
+        }
+        return _shared!
+    }
+}
+```
+
+### Casos que Actors NÃO previnem
+
+#### 1. External State (FileSystem, Database)
+
+```swift
+actor FileStorage {
+    func save(_ data: Data, to path: String) throws {
+        try data.write(to: URL(fileURLWithPath: path))
+    }
+}
+
+// ⚠️ Actor protege o método, mas NÃO o arquivo!
+await storage.save(data1, to: "/tmp/file.txt")  // Task 1
+await storage.save(data2, to: "/tmp/file.txt")  // Task 2
+
+// Actor garante que save() executa serialmente
+// MAS: Sistema de arquivos pode ter race conditions!
+
+// ✅ Solução: Adicionar file locking
+actor FileStorage {
+    private let fileManager = FileManager.default
+    
+    func save(_ data: Data, to path: String) throws {
+        let coordinator = NSFileCoordinator()
+        var error: NSError?
+        
+        coordinator.coordinate(writingItemAt: url, options: [], error: &error) { url in
+            try? data.write(to: url)
+        }
+    }
+}
+```
+
+#### 2. Objetos Compartilhados
+
+```swift
+// ⚠️ Actor protege SUAS propriedades, não objetos passados!
+actor Processor {
+    func process(_ array: NSMutableArray) {
+        array.add("Item")  // ⚠️ NSMutableArray não é protegido!
+    }
+}
+
+let array = NSMutableArray()
+
+Task {
+    await processor.process(array)
+}
+
+Task {
+    array.add("Other")  // 💥 Data race! array não é protegido!
+}
+
+// ✅ Solução: Use value types (Sendable)
+actor Processor {
+    func process(_ array: [String]) -> [String] {
+        var mutable = array
+        mutable.append("Item")
+        return mutable  // ✅ Copy, sem data race!
+    }
+}
+```
+
+### 🎯 Padrões Anti-Data Race
+
+```swift
+// ✅ Pattern 1: Actors para estado mutável compartilhado
+actor StateManager {
+    private var state: AppState
+}
+
+// ✅ Pattern 2: @MainActor para UI
+@MainActor
+class ViewModel {
+    var items: [Item] = []
+}
+
+// ✅ Pattern 3: Structs (value types) são thread-safe por natureza
+struct Film: Sendable {
+    let id: String
+    let title: String
+}
+
+// ✅ Pattern 4: Imutabilidade
+class Config {
+    let apiKey: String  // let = imutável = thread-safe!
+}
+
+// ✅ Pattern 5: Isolation via Task
+@MainActor
+func updateUI() async {
+    // Garantido main thread
+}
+```
+
+### 📊 Comparação: Antes vs Depois
+
+| Aspecto | Pré-Swift Concurrency | Com Actors |
+|---------|----------------------|------------|
+| **Data Races** | Comuns, difíceis detectar | Prevenidos em compile-time |
+| **Sincronização** | Manual (locks, semaphores) | Automática |
+| **Deadlocks** | Fáceis de criar | Muito raros |
+| **Performance** | Overhead de locking | Otimizado pelo runtime |
+| **Testing** | Thread Sanitizer | Thread Sanitizer + compiler |
+| **Code Review** | Difícil verificar | Compiler verifica |
+
+### 🔍 Checklist: Prevenindo Data Races
+
+```swift
+// ✅ SEMPRE:
+1. [ ] Estado mutável compartilhado = actor
+2. [ ] UI mutations = @MainActor
+3. [ ] Use value types (structs) quando possível
+4. [ ] Prefira let sobre var
+5. [ ] Run Thread Sanitizer nos testes
+6. [ ] Marque types como Sendable
+7. [ ] Evite Task.detached (perde isolation)
+8. [ ] Não compartilhe NSMutableArray, NSMutableDictionary
+
+// ❌ NUNCA:
+1. [ ] Mutate propriedades de outro actor sem await
+2. [ ] Compartilhar classes mutáveis entre actors
+3. [ ] Usar lazy var sem proteção
+4. [ ] Acessar static var mutável sem sync
+5. [ ] Ignorar warnings do Thread Sanitizer
+6. [ ] Assumir que Dictionary/Array são thread-safe
+```
+
+### 💡 Resumo: Actors vs Data Races
+
+```
+┌──────────────────────────────────────────────────────────┐
+│           COMO ACTORS PREVINEM DATA RACES                │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  Problema: Acesso simultâneo ao mesmo estado mutável     │
+│                                                          │
+│  Solução do Actor:                                       │
+│    1. Serialização: Uma operação por vez                 │
+│    2. Isolation: Estado privado ao actor                 │
+│    3. Compiler: Força await em boundaries                │
+│    4. Runtime: Queue gerencia execução                   │
+│                                                          │
+│  Resultado:                                              │
+│    ✅ Zero data races em código do actor                 │
+│    ✅ Verificado em compile-time                         │
+│    ✅ Performance otimizada                              │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Regra de Ouro:**
+> Se múltiplas tasks/threads precisam modificar o mesmo estado, use **actor**. Se é UI, use **@MainActor**. Caso contrário, prefira **value types** imutáveis.
+
+---
+
+## Arquitetura com Actors - Granularidade
+
+### A Grande Questão: Quantos Actors Criar?
+
+> **🤔 DILEMA:** "Devo criar um actor para cada responsabilidade? Um actor para requests, outro para cache, outro para analytics?"
+
+### A Resposta: Granularidade Correta
+
+```
+┌────────────────────────────────────────────────────────────┐
+│              GRANULARIDADE DE ACTORS                       │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ❌ MUITO GRANULAR (over-engineering):                     │
+│                                                            │
+│  actor FetchFilmsActor { }                                 │
+│  actor FetchLocationsActor { }                             │
+│  actor FetchPeopleActor { }                                │
+│  actor CacheFilmsActor { }                                 │
+│  actor CacheLocationsActor { }                             │
+│                                                            │
+│  Problema: Complexidade desnecessária!                     │
+│                                                            │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ✅ GRANULARIDADE CORRETA:                                 │
+│                                                            │
+│  actor URLSessionAdapter { }      ← HTTP client            │
+│  actor FilmsRepository { }        ← Toda lógica de films   │
+│  actor LocationsRepository { }    ← Toda lógica de locs    │
+│  actor PendingChangeStore { }     ← File persistence       │
+│                                                            │
+│  Benefício: Simples, claro, mantível!                      │
+│                                                            │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ❌ MUITO AMPLO (god object):                              │
+│                                                            │
+│  actor EverythingActor {                                   │
+│      func fetchFilms() { }                                 │
+│      func saveCache() { }                                  │
+│      func trackAnalytics() { }                             │
+│      func syncCloud() { }                                  │
+│  }                                                         │
+│                                                            │
+│  Problema: Actor vira gargalo!                             │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 🎯 Regra de Ouro: Um Actor por Recurso Compartilhado
+
+```swift
+// ✅ CORRETO: Actor por recurso compartilhado
+
+// Actor 1: Networking (URLSession compartilhado)
+actor URLSessionAdapter {
+    private let session: URLSession // ← Recurso compartilhado
+    
+    func request<T>(...) async throws -> T {
+        // Serializa acesso ao URLSession
+    }
+}
+
+// Actor 2: Films Repository (cache compartilhado)
+actor FilmsRepository {
+    private var cache: [Film]? // ← Recurso compartilhado
+    
+    func fetchAll() async throws -> [Film] {
+        // Serializa acesso ao cache
+    }
+}
+
+// Actor 3: File Storage (FileManager compartilhado)
+actor PendingChangeStore {
+    private let storage: PersistenceStorage // ← Recurso compartilhado
+    
+    func save(...) async throws {
+        // Serializa acesso ao disk
+    }
+}
+```
+
+### Por que NÃO criar actors muito granulares?
+
+```swift
+// ❌ ERRADO: Over-engineering
+actor FetchOperationActor {
+    func fetch() async throws -> Data { }
+}
+
+actor CacheOperationActor {
+    func cache(_ data: Data) async throws { }
+}
+
+actor ValidateOperationActor {
+    func validate(_ data: Data) async throws -> Bool { }
+}
+
+// Uso:
+let data = try await fetchActor.fetch()
+try await cacheActor.cache(data)
+let valid = try await validateActor.validate(data)
+
+// Problemas:
+// 1. Complexidade: 3 actors para 1 responsabilidade!
+// 2. Performance: 3 context switches desnecessários
+// 3. Manutenção: Muito difícil de entender
+```
+
+```swift
+// ✅ CORRETO: Um actor, múltiplas operações
+actor DataRepository {
+    private var cache: [Data] = []
+    
+    func fetch() async throws -> Data {
+        // Fetch implementation
+    }
+    
+    func cache(_ data: Data) async throws {
+        cache.append(data)
+    }
+    
+    func validate(_ data: Data) async throws -> Bool {
+        // Validation logic
+    }
+}
+
+// Uso:
+let data = try await repository.fetch()
+try await repository.cache(data)
+let valid = try await repository.validate(data)
+
+// Benefícios:
+// 1. Simples: Um actor, responsabilidade clara
+// 2. Performance: Estado local, menos switches
+// 3. Manutenção: Fácil entender e modificar
+```
+
+### 💡 Pattern: Repository como Actor
+
+```swift
+// ✅ PADRÃO DO GHIBLIAPP: Repository encapsula TUDO relacionado à entidade
+
+actor FilmsRepository {
+    // Estado interno protegido
+    private let httpClient: HTTPClient
+    private let persistence: PersistenceStorage
+    private var memoryCache: [Film]?
+    private var lastFetchTime: Date?
+    
+    // Todas operações de Films em um lugar
+    func fetchAll(forceRefresh: Bool) async throws -> [Film] {
+        // Coordena: cache check → network → cache update
+        if !forceRefresh, let cached = memoryCache, !isCacheExpired() {
+            return cached
+        }
+        
+        let films = try await fetchFromNetwork()
+        memoryCache = films
+        lastFetchTime = Date()
+        try? await persistence.save(films)
+        return films
+    }
+    
+    func fetchById(_ id: String) async throws -> Film {
+        // Busca no cache primeiro
+        if let cached = memoryCache?.first(where: { $0.id == id }) {
+            return cached
+        }
+        return try await fetchFromNetwork(id: id)
+    }
+    
+    func invalidateCache() {
+        memoryCache = nil
+        lastFetchTime = nil
+    }
+    
+    // Métodos privados no actor
+    private func fetchFromNetwork() async throws -> [Film] { }
+    private func isCacheExpired() -> Bool { }
+}
+```
+
+**Por que este design é excelente:**
+1. ✅ **Coesão:** Tudo relacionado a Films em um lugar
+2. ✅ **Encapsulamento:** Cache e network internos
+3. ✅ **Thread-safety:** Actor protege estado mutável
+4. ✅ **Testável:** Protocolo + dependency injection
+
+### Actor Composition: Quando separar?
+
+```swift
+// ✅ Separe quando há INDEPENDÊNCIA de recursos
+
+// Actor 1: HTTP (URLSession)
+actor URLSessionAdapter {
+    func request<T>(...) async throws -> T { }
+}
+
+// Actor 2: Cache (memória/disk)
+actor CacheManager {
+    func get<T>(...) async -> T? { }
+    func set<T>(...) async throws { }
+}
+
+// Actor 3: Repository usa ambos
+actor FilmsRepository {
+    private let httpClient: URLSessionAdapter
+    private let cache: CacheManager
+    
+    func fetchAll() async throws -> [Film] {
+        // 1. Tenta cache
+        if let cached: [Film] = await cache.get(key: "films") {
+            return cached
+        }
+        
+        // 2. Busca network
+        let films: [Film] = try await httpClient.request(with: .films)
+        
+        // 3. Salva cache
+        try await cache.set(key: "films", value: films)
+        
+        return films
+    }
+}
+```
+
+**Quando separar:**
+- ✅ **Recursos independentes** (URLSession ≠ Cache)
+- ✅ **Reutilizáveis** (URLSessionAdapter para todas APIs)
+- ✅ **Responsabilidades distintas** (HTTP ≠ Storage)
+
+**Quando NÃO separar:**
+- ❌ **Operações relacionadas** (fetch + validate + transform)
+- ❌ **Estado acoplado** (cache depende de lastFetchTime)
+- ❌ **Um recurso** (um FileManager, um URLSession)
+
+### 🎯 Checklist: Devo criar um Actor?
+
+```swift
+// Perguntas:
+
+1. Há estado mutável compartilhado?
+   ❌ Não → Struct/Class normal
+   ✅ Sim → Continue...
+
+2. É UI?
+   ✅ Sim → @MainActor
+   ❌ Não → Continue...
+
+3. Múltiplas tasks acessam simultaneamente?
+   ❌ Não → Class normal (single-threaded)
+   ✅ Sim → Continue...
+
+4. É recurso global (DB, FileSystem, Analytics)?
+   ✅ Sim → Global Actor
+   ❌ Não → Continue...
+
+5. Tem responsabilidade clara (Repository, Service)?
+   ✅ Sim → Actor normal ✅
+   ❌ Não → Repense design!
+```
+
+### 💡 Exemplo Real do GhibliApp
+
+**Análise da arquitetura:**
+
+```swift
+// ✅ ACTORS NO GHIBLIAPP:
+
+1. URLSessionAdapter (actor)
+   Por quê? URLSession compartilhado, múltiplas requests
+
+2. FilmsRepository (actor)
+   Por quê? Cache compartilhado, múltiplas features acessam
+
+3. LocationsRepository (actor)
+   Por quê? Similar a FilmsRepository
+
+4. PendingChangeStore (actor)
+   Por quê? File I/O compartilhado
+
+5. SyncManager (actor)
+   Por quê? Coordena multiple async operations
+
+6. ConnectivityMonitor (actor)
+   Por quê? NWPathMonitor compartilhado
+
+// ✅ @MAINACTOR NO GHIBLIAPP:
+
+1. Todos ViewModels
+   Por quê? Atualizam UI
+
+// ❌ NÃO SÃO ACTORS:
+
+1. UseCases (classes normais)
+   Por quê? Stateless, apenas coordenam
+
+2. Mappers (structs)
+   Por quê? Pure functions, sem estado
+
+3. DTOs (structs)
+   Por quê? Data containers, imutáveis
+```
+
+**Padrão que emerge:**
+- ✅ Actor = Tem estado mutável + múltiplos acessos
+- ✅ @MainActor = Toca em UI
+- ✅ Class/Struct = Stateless ou single-threaded
+
+---
+
+## Sendable - Garantindo Thread-Safety
+
+### O que é Sendable?
+
+> **💡 CONCEITO:** `Sendable` é um protocolo que garante que um tipo pode ser passado com segurança entre contextos de concorrência (actors, tasks).
+
+### Por que Sendable existe?
+
+```swift
+// ❌ PROBLEMA: Passar objeto mutável entre actors
+class UserProfile {
+    var name: String
+    var age: Int
+}
+
+actor ProfileStore {
+    func save(_ profile: UserProfile) {
+        // 💥 PERIGO! profile pode ser modificado em outra thread!
+        storage.save(profile)
+    }
+}
+
+// Thread 1:
+let profile = UserProfile(name: "John", age: 30)
+await profileStore.save(profile)
+
+// Thread 2:
+profile.name = "Jane" // 💥 DATA RACE! ProfileStore pode estar lendo!
+```
+
+**Solução: Sendable garante que tipo é thread-safe!**
+
+### Tipos que são Sendable automaticamente
+
+```swift
+// ✅ Value types (structs, enums) sem referências mutáveis
+struct UserProfile: Sendable { // ✅ Automático!
+    let name: String
+    let age: Int
+}
+
+enum Status: Sendable { // ✅ Automático!
+    case active
+    case inactive
+}
+
+// ✅ Actors são Sendable
+actor UserStore: Sendable { // ✅ Actors protegem estado
+}
+
+// ✅ @MainActor classes são Sendable
+@MainActor
+class ViewModel: Sendable { }
+
+// ✅ Tipos básicos do Swift
+let x: Int = 42 // Sendable
+let s: String = "hi" // Sendable
+let array: [Int] = [1,2,3] // Sendable se elementos são Sendable
+```
+
+### Tipos que NÃO são Sendable automaticamente
+
+```swift
+// ❌ Classes (reference types) sem isolamento
+class UserProfile { // ❌ NÃO é Sendable!
+    var name: String
+}
+
+// ❌ Structs com referências mutáveis
+struct Container { // ❌ NÃO é Sendable!
+    var object: MutableClass
+}
+
+// ❌ Closures que capturam estado mutável
+var count = 0
+let closure = { count += 1 } // ❌ NÃO é Sendable!
+```
+
+### Como tornar um tipo Sendable
+
+#### Opção 1: Usar @unchecked Sendable (cuidado!)
+
+```swift
+// ⚠️ Use apenas se VOCÊ garante thread-safety manualmente
+class ThreadSafeCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _count = 0
+    
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _count
+    }
+    
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        _count += 1
+    }
+}
+
+// ⚠️ @unchecked = "confie em mim, é thread-safe"
+// Apenas use se implementou locks, queues, ou outros mecanismos!
+```
+
+#### Opção 2: Transformar em Value Type
+
+```swift
+// ❌ ANTES: Reference type (não Sendable)
+class UserProfile {
+    var name: String
+    var age: Int
+}
+
+// ✅ DEPOIS: Value type (Sendable automático!)
+struct UserProfile: Sendable {
+    let name: String
+    let age: Int
+}
+```
+
+#### Opção 3: Usar Actor
+
+```swift
+// ✅ Actor = Sendable automaticamente!
+actor UserProfileStore {
+    private var profiles: [String: UserProfile] = [:]
+    
+    func save(_ profile: UserProfile) {
+        profiles[profile.id] = profile
+    }
+}
+```
+
+### @Sendable em Closures
+
+```swift
+// ❌ Closure normal - pode capturar estado mutável
+func process(completion: () -> Void) {
+    Task {
+        await doWork()
+        completion() // ⚠️ completion pode não ser thread-safe
+    }
+}
+
+// ✅ @Sendable closure - garante thread-safety
+func process(completion: @Sendable () -> Void) {
+    Task {
+        await doWork()
+        completion() // ✅ Garantido thread-safe!
+    }
+}
+
+// Uso:
+var count = 0
+process {
+    count += 1 // ❌ ERRO: Capturing 'count' is not Sendable!
+}
+
+// ✅ Correto:
+let value = 42 // Sendable
+process {
+    print(value) // ✅ OK!
+}
+```
+
+### 💡 Exemplo Real: GhibliApp
+
+**Arquivo:** `GhibliApp/Data/Network/Adapters/URLSessionAdapter.swift`
+
+```swift
+public actor URLSessionAdapter: HTTPClient {
+    private let requestFactory: EndpointRequestFactory & Sendable
+    //                                                    ^^^^^^^^
+    //                                     ✅ Requer Sendable!
+    
+    public func request<T: Decodable & Sendable>(...) async throws -> T
+    //                                  ^^^^^^^^
+    //                       ✅ T deve ser Sendable!
+}
+```
+
+**Por que `Sendable` aqui?**
+
+```swift
+// URLSessionAdapter é actor
+// Quando você passa T para fora do actor, precisa ser thread-safe!
+
+let films: [Film] = try await httpClient.request(with: .films)
+//         ^^^^^^
+//         Atravessa actor boundary → Precisa ser Sendable!
+
+// Film precisa ser Sendable:
+struct Film: Sendable { // ✅
+    let id: String
+    let title: String
+    // ... todas propriedades Sendable
+}
+```
+
+### Sendable em Generics
+
+```swift
+// ✅ Generic com constraint Sendable
+func process<T: Sendable>(_ value: T) async {
+    Task.detached {
+        // ✅ Seguro: T é Sendable!
+        await doSomething(with: value)
+    }
+}
+
+// ❌ Sem Sendable constraint
+func process<T>(_ value: T) async {
+    Task.detached {
+        await doSomething(with: value) // ⚠️ Warning: T pode não ser Sendable!
+    }
+}
+```
+
+### Arrays, Dictionaries e Sendable
+
+```swift
+// ✅ Array é Sendable SE elementos forem Sendable
+let numbers: [Int] = [1, 2, 3] // ✅ Sendable (Int é Sendable)
+
+struct Film: Sendable { }
+let films: [Film] = [...] // ✅ Sendable (Film é Sendable)
+
+class MutableObject { }
+let objects: [MutableObject] = [...] // ❌ NÃO Sendable!
+
+// ✅ Dictionary é Sendable SE Key e Value forem Sendable
+let cache: [String: Film] = [:] // ✅ Sendable
+let mutableCache: [String: MutableObject] = [:] // ❌ NÃO Sendable!
+```
+
+### 🎯 Quando se preocupar com Sendable?
+
+```swift
+// ✅ Em boundaries de actors:
+actor Repository {
+    func save<T: Sendable>(_ item: T) { } // ✅ Necessário!
+}
+
+// ✅ Em Task.detached:
+Task.detached { [data] in // ⚠️ data precisa ser Sendable
+    process(data)
+}
+
+// ✅ Em closures assíncronos:
+func fetch(completion: @Sendable (Data) -> Void) { }
+
+// ✅ Em protocolos de actors:
+protocol DataStore: Actor, Sendable {
+    func save<T: Sendable>(_ item: T) async
+}
+```
+
+### ⚠️ Erros Comuns com Sendable
+
+```swift
+// Erro #1: Passar NSObject entre actors
+class LegacyObject: NSObject { } // ❌ NSObject não é Sendable!
+
+actor Store {
+    func save(_ obj: LegacyObject) { // ⚠️ Warning!
+    }
+}
+
+// Solução: Converta para value type
+struct LegacyData: Sendable {
+    let id: String
+    let name: String
+}
+
+// Erro #2: Capturar self em closure
+class ViewModel {
+    func load() {
+        Task { // ⚠️ Warning: self não é Sendable!
+            await doWork()
+            self.update() // Captura self
+        }
+    }
+}
+
+// Solução: @MainActor ou [weak self]
+@MainActor
+class ViewModel: Sendable { // ✅ @MainActor = Sendable!
+    func load() {
+        Task {
+            await doWork()
+            self.update() // ✅ OK!
+        }
+    }
+}
+```
+
+### 📚 Resumo: Sendable Cheat Sheet
+
+```swift
+┌──────────────────────────────────────────────────────────┐
+│                   SENDABLE GUIDE                         │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  ✅ Sendable automático:                                 │
+│    • Value types (struct, enum) imutáveis               │
+│    • Actors                                             │
+│    • @MainActor classes                                 │
+│    • Int, String, Bool, Array<Sendable>, etc.          │
+│                                                          │
+│  ❌ NÃO Sendable:                                        │
+│    • Classes sem isolamento                             │
+│    • NSObject subclasses                                │
+│    • Closures capturando estado mutável                 │
+│                                                          │
+│  ⚠️ @unchecked Sendable:                                 │
+│    • Use apenas se implementou thread-safety manual     │
+│    • Locks, queues, atomic operations                   │
+│                                                          │
+│  🎯 Onde importa:                                        │
+│    • Actor methods com parâmetros                       │
+│    • Task.detached { }                                  │
+│    • @Sendable closures                                 │
+│    • Generics atravessando actor boundaries             │
+└──────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -2863,6 +4664,389 @@ class ViewModel {
 **Causa:** Tentou acessar propriedade `@MainActor` de outro actor sem `await`
 
 **Solução:** Use `await` para acessar propriedades cross-actor
+
+---
+
+## 🎯 Problemas Comuns com Actors
+
+### Problema #1: Actor Reentrancy (Reentrada)
+
+> **💡 CONCEITO:** Actor methods podem ser **reentrant** - uma segunda chamada pode começar antes da primeira terminar!
+
+```swift
+actor BankAccount {
+    private var balance = 1000
+    
+    func withdraw(_ amount: Int) async {
+        guard balance >= amount else {
+            print("Insuficiente")
+            return
+        }
+        
+        // ⏸️ SUSPENSION POINT!
+        await Task.sleep(nanoseconds: 100_000_000) // Simula delay
+        
+        // ⚠️ PERIGO! balance pode ter mudado!
+        balance -= amount
+        print("Sacou \(amount), saldo: \(balance)")
+    }
+}
+
+// Uso:
+let account = BankAccount()
+
+// Chamadas simultâneas:
+Task { await account.withdraw(600) }
+Task { await account.withdraw(600) }
+
+// 💥 RESULTADO INESPERADO:
+// Sacou 600, saldo: 400  ✅
+// Sacou 600, saldo: -200 ❌ NEGATIVO!
+```
+
+**O que aconteceu?**
+
+```
+Timeline:
+
+  0ms: Task 1 → withdraw(600)
+       └─ balance = 1000 ✅
+       └─ guard ok ✅
+       └─ await Task.sleep... ⏸️ SUSPENDE
+       
+ 10ms: Task 2 → withdraw(600)
+       └─ balance = 1000 ✅ (ainda não mudou!)
+       └─ guard ok ✅
+       └─ await Task.sleep... ⏸️ SUSPENDE
+       
+100ms: Task 1 retoma
+       └─ balance -= 600
+       └─ balance = 400 ✅
+       
+110ms: Task 2 retoma
+       └─ balance -= 600
+       └─ balance = -200 ❌ BUG!
+```
+
+**Solução: Checar estado após suspension**
+
+```swift
+actor BankAccount {
+    private var balance = 1000
+    
+    func withdraw(_ amount: Int) async {
+        guard balance >= amount else {
+            print("Insuficiente")
+            return
+        }
+        
+        await Task.sleep(nanoseconds: 100_000_000)
+        
+        // ✅ RECHECA após suspension!
+        guard balance >= amount else {
+            print("Insuficiente (mudou durante operação)")
+            return
+        }
+        
+        balance -= amount
+        print("Sacou \(amount), saldo: \(balance)")
+    }
+}
+```
+
+### Problema #2: Actor Isolation Violations
+
+```swift
+// ❌ ERRADO: Acessar propriedade do actor sincronamente
+actor DataStore {
+    var items: [Item] = []
+}
+
+let store = DataStore()
+print(store.items) // ❌ ERRO: actor-isolated property!
+
+// ✅ CORRETO: await
+let items = await store.items // ✅
+```
+
+### Problema #3: Capture de self em actor methods
+
+```swift
+actor Processor {
+    private var state = 0
+    
+    // ❌ ERRADO: Capturando self desnecessariamente
+    func process() async {
+        Task {
+            await self.updateState() // ⚠️ self explícito
+        }
+    }
+    
+    // ✅ CORRETO: Actor já garante isolation
+    func process() async {
+        Task {
+            await updateState() // ✅ Sem self
+        }
+    }
+    
+    private func updateState() {
+        state += 1
+    }
+}
+```
+
+### Problema #4: Deadlock com Actors
+
+```swift
+// ❌ DEADLOCK POTENCIAL
+actor ActorA {
+    let actorB: ActorB
+    
+    func doWork() async {
+        await actorB.process(callback: self.callback)
+    }
+    
+    func callback() {
+        // This never completes!
+    }
+}
+
+actor ActorB {
+    func process(callback: () -> Void) {
+        callback() // ❌ Tenta chamar ActorA sync!
+    }
+}
+
+// ✅ SOLUÇÃO: Callback async
+actor ActorA {
+    let actorB: ActorB
+    
+    func doWork() async {
+        await actorB.process(callback: self.callback)
+    }
+    
+    func callback() async { // ✅ async
+        // Works!
+    }
+}
+
+actor ActorB {
+    func process(callback: () async -> Void) async {
+        await callback() // ✅ await
+    }
+}
+```
+
+### Problema #5: Performance com muitas propriedades
+
+```swift
+// ⚠️ LENTO: Múltiplos await para propriedades
+actor DataStore {
+    var name: String
+    var age: Int
+    var email: String
+}
+
+let store = DataStore(...)
+
+// ❌ Cada acesso = suspension
+let name = await store.name    // ⏸️
+let age = await store.age      // ⏸️
+let email = await store.email  // ⏸️
+
+// ✅ MELHOR: Um método que retorna tudo
+actor DataStore {
+    private var name: String
+    private var age: Int
+    private var email: String
+    
+    func getProfile() -> (String, Int, String) {
+        return (name, age, email) // ✅ Um await!
+    }
+}
+
+let (name, age, email) = await store.getProfile() // ⏸️ Uma vez!
+```
+
+### Problema #6: Actor não protege closures
+
+```swift
+actor Storage {
+    private var items: [Item] = []
+    
+    // ❌ PERIGO: Closure pode escapar!
+    func forEach(_ handler: (Item) -> Void) {
+        items.forEach(handler) // ⚠️ handler pode capturar items!
+    }
+}
+
+// Uso perigoso:
+await storage.forEach { item in
+    // Este closure pode executar fora do actor!
+    globalArray.append(item) // 💥 Data race!
+}
+
+// ✅ SOLUÇÃO: @Sendable ou async
+actor Storage {
+    private var items: [Item] = []
+    
+    func forEach(_ handler: @Sendable (Item) -> Void) async {
+        for item in items {
+            handler(item)
+        }
+    }
+}
+```
+
+### Problema #7: Actor initialization
+
+```swift
+// ⚠️ CUIDADO: Init não pode ser async!
+actor DataLoader {
+    let data: Data
+    
+    init() async { // ❌ ERRO: init não pode ser async!
+        self.data = try await loadData()
+    }
+}
+
+// ✅ SOLUÇÃO 1: Setup method
+actor DataLoader {
+    var data: Data?
+    
+    init() {
+        self.data = nil
+    }
+    
+    func setup() async throws {
+        self.data = try await loadData()
+    }
+}
+
+// Uso:
+let loader = DataLoader()
+await loader.setup()
+
+// ✅ SOLUÇÃO 2: Factory method
+actor DataLoader {
+    let data: Data
+    
+    private init(data: Data) {
+        self.data = data
+    }
+    
+    static func create() async throws -> DataLoader {
+        let data = try await loadData()
+        return DataLoader(data: data)
+    }
+}
+
+// Uso:
+let loader = try await DataLoader.create()
+```
+
+### Problema #8: Não-isolated methods
+
+```swift
+actor Calculator {
+    private var state = 0
+    
+    // ✅ Isolated (default) - protegido
+    func add(_ value: Int) {
+        state += value
+    }
+    
+    // ⚠️ Nonisolated - NÃO protegido!
+    nonisolated func multiply(_ a: Int, _ b: Int) -> Int {
+        // return state * a // ❌ ERRO: Não pode acessar state!
+        return a * b // ✅ Apenas pure function
+    }
+}
+
+// Uso:
+let calc = Calculator()
+await calc.add(5)           // ✅ await necessário
+let result = calc.multiply(2, 3) // ✅ Sem await!
+```
+
+**Quando usar `nonisolated`:**
+- ✅ Pure functions (sem acesso a estado)
+- ✅ Protocol conformance que não pode ser async
+- ✅ Computed properties que não acessam estado
+
+### Problema #9: Actor com @Published
+
+```swift
+// ❌ NÃO FUNCIONA: @Published não funciona com actors!
+import Combine
+
+actor DataStore {
+    @Published var items: [Item] = [] // ❌ ERRO!
+}
+
+// ✅ SOLUÇÃO: Use @MainActor + @Observable
+@MainActor
+@Observable
+class DataStore {
+    var items: [Item] = [] // ✅ SwiftUI observa!
+}
+```
+
+### Problema #10: Testing actors
+
+```swift
+// ⚠️ Tests precisam de await!
+final class ActorTests: XCTestCase {
+    func testCounter() async throws { // ✅ async!
+        let counter = Counter()
+        await counter.increment()
+        
+        let value = await counter.value
+        XCTAssertEqual(value, 1)
+    }
+}
+
+// ✅ Ou use Task:
+final class ActorTests: XCTestCase {
+    func testCounter() throws {
+        let expectation = expectation(description: "Counter")
+        
+        Task {
+            let counter = Counter()
+            await counter.increment()
+            let value = await counter.value
+            XCTAssertEqual(value, 1)
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 1.0)
+    }
+}
+```
+
+### 🎯 Checklist: Evitando problemas com Actors
+
+```swift
+// ✅ SEMPRE:
+1. [ ] Recheca condições após await (reentrancy!)
+2. [ ] Usa await para acessar propriedades
+3. [ ] Métodos que retornam múltiplos valores (batch)
+4. [ ] @Sendable em closures passados para actors
+5. [ ] Factory methods para init async
+6. [ ] nonisolated apenas para pure functions
+7. [ ] @MainActor para UI, não actors
+8. [ ] Tests são async
+
+// ❌ NUNCA:
+1. [ ] Assumir que estado não muda durante await
+2. [ ] Forçar sync access a actor properties
+3. [ ] Capturar self desnecessariamente
+4. [ ] Criar deadlocks com callbacks sync
+5. [ ] Usar @Published em actors
+6. [ ] Expor closures que capturam estado
+7. [ ] Init async (use factory)
+8. [ ] Global actors para features (over-engineering)
+```
 
 ---
 
