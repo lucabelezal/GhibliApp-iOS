@@ -39,7 +39,7 @@ struct SettingsView: View {
             bodyContent
         }
         .toolbarTitleDisplayMode(.inline)
-        .navigationTitle(L10n.tabs.settings)
+        .navigationTitle(L10n.Tabs.settings)
         .setAppearanceTheme()
         .alert(isPresented: resetBinding) {
             Alert(
@@ -81,8 +81,8 @@ private extension SettingsView {
                 }
         case .empty:
             EmptyStateView(
-                title: L10n.Settings.empty.title,
-                subtitle: L10n.Settings.empty.subtitle,
+                title: L10n.Settings.Empty.title,
+                subtitle: L10n.Settings.Empty.subtitle,
                 fullScreen: true
             )
         case .error(let error):

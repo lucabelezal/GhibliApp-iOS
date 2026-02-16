@@ -9,7 +9,7 @@ struct SearchView: View {
             AppBackground()
             bodyContent
         }
-        .navigationTitle(L10n.tabs.search)
+        .navigationTitle(L10n.Tabs.search)
         .searchable(
             text: Binding(
                 get: { viewModel.query },
@@ -27,8 +27,8 @@ private extension SearchView {
         switch viewModel.state {
         case .idle:
             EmptyStateView(
-                title: L10n.Search.empty.title,
-                subtitle: L10n.Search.empty.subtitle,
+                title: L10n.Search.Empty.title,
+                subtitle: L10n.Search.Empty.subtitle,
                 fullScreen: true
             )
         case .loading:
@@ -40,8 +40,8 @@ private extension SearchView {
             resultsList(for: content)
         case .empty:
             EmptyStateView(
-                title: L10n.Search.noResults.title,
-                subtitle: L10n.Search.noResults.subtitle,
+                title: L10n.Search.NoResults.title,
+                subtitle: L10n.Search.NoResults.subtitle,
                 fullScreen: true
             )
         case .error(let error):
@@ -93,9 +93,9 @@ private extension SearchView {
         VStack(spacing: 16) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.largeTitle)
-            Text(L10n.Search.offline.title)
+            Text(L10n.Search.Offline.title)
                 .multilineTextAlignment(.center)
-            Text(L10n.Search.offline.subtitle)
+            Text(L10n.Search.Offline.subtitle)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

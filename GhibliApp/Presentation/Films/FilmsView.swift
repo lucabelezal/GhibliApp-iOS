@@ -12,7 +12,7 @@ struct FilmsView: View {
             bodyContent
             snackbar
         }
-        .navigationTitle(L10n.tabs.films)
+        .navigationTitle(L10n.Tabs.films)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await viewModel.load() }
@@ -33,8 +33,8 @@ private extension FilmsView {
                 filmsList(for: content)
             case .empty:
                 EmptyStateView(
-                    title: L10n.Films.empty.title,
-                    subtitle: L10n.Films.empty.subtitle,
+                    title: L10n.Films.Empty.title,
+                    subtitle: L10n.Films.Empty.subtitle,
                     fullScreen: true
                 )
                 .padding(.top, 24)

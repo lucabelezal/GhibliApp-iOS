@@ -10,7 +10,7 @@ struct FavoritesView: View {
             AppBackground()
             bodyContent
         }
-        .navigationTitle(L10n.tabs.favorites)
+        .navigationTitle(L10n.Tabs.favorites)
         .toolbarBackground(.hidden, for: .navigationBar)
         .task { await viewModel.load() }
     }
