@@ -76,15 +76,15 @@ Esta é a regra mais importante para entender `@StateObject` vs `@ObservedObject
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                 Pergunta Chave:                       │
-│                                                        │
-│   "Esta view CRIA o objeto ou RECEBE ele pronto?"     │
-│                                                        │
+│                 Pergunta Chave:                      │
+│                                                      │
+│   "Esta view CRIA o objeto ou RECEBE ele pronto?"    │
+│                                                      │
 ├──────────────────────────────────────────────────────┤
-│                                                        │
-│   ✅ CRIA → Use @StateObject (ou @State)              │
-│   ✅ RECEBE → Use @ObservedObject (ou apenas passa)   │
-│                                                        │
+│                                                      │
+│   ✅ CRIA → Use @StateObject (ou @State)             │
+│   ✅ RECEBE → Use @ObservedObject (ou apenas passa)  │
+│                                                      │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -242,12 +242,12 @@ struct ChildView: View {
 ┌─────────────────────────────────────┐
 │          ParentView                 │
 │                                     │
-│   @State private var count = 0     │  ← DONO do estado
+│   @State private var count = 0      │  ← DONO do estado
 │          │                          │
 │          ├─ Lê o valor              │
 │          └─ Escreve no valor        │
 │                                     │
-│     CounterView(count: $count)     │  ← Passa o Binding ($)
+│     CounterView(count: $count)      │  ← Passa o Binding ($)
 │                                     │
 └─────────────┬───────────────────────┘
               │
@@ -256,7 +256,7 @@ struct ChildView: View {
 ┌─────────────────────────────────────┐
 │          CounterView                │
 │                                     │
-│   @Binding var count: Int          │  ← OBSERVA o estado
+│   @Binding var count: Int           │  ← OBSERVA o estado
 │          │                          │
 │          ├─ Lê o valor              │
 │          └─ Escreve no valor        │  ← Atualiza o pai!
@@ -504,14 +504,14 @@ UsernameInput(text: $username) // ✅ Passa o Binding
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                                                        │
-│   "Esta view CRIA o ViewModel ou RECEBE ele pronto?"  │
-│                                                        │
+│                                                      │
+│   "Esta view CRIA o ViewModel ou RECEBE ele pronto?" │
+│                                                      │
 ├──────────────────────────────────────────────────────┤
-│                                                        │
-│   ✅ CRIA → @StateObject                              │
-│   ✅ RECEBE → @ObservedObject                         │
-│                                                        │
+│                                                      │
+│   ✅ CRIA → @StateObject                             │
+│   ✅ RECEBE → @ObservedObject                        │
+│                                                      │
 └──────────────────────────────────────────────────────┘
 ```
 
