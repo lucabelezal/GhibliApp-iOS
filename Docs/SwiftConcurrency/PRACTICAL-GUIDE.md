@@ -40,47 +40,40 @@
 Confuso sobre qual padrão usar? Siga este fluxograma:
 
 ```
-┌──────────────────────────────────────────────────┐
-│  Preciso fazer algo ASSÍNCRONO?                  │
-│  (rede, banco de dados, I/O)                     │
-└────────────────┬─────────────────────────────────┘
-                 │
-        ┌────────▼────────┐
-        │      NÃO        │ → Use função síncrona
-        └────────────────┘
-                 │
-        ┌────────▼──────────────────────────┐
-        │   É UI (ViewModel, View)?         │
-        │   (Modifica @State/@Observable)   │
-        └────┬──────────────────┬───────────┘
-             │                  │
-           SIM               NÃO
-             │                  │
-        ┌────▼─────────┐   ┌────▼──────┐
-        │ @MainActor   │   │  Quantas   │
-        │ (automático!)│   │ operações  │
-        └──────────────┘   │ assíncronas│
-                           │ rodam?     │
-                           └───┬────────┘
-                               │
-                    ┌──────────┼──────────┐
-                    │          │         │
-                  1 │         2-4       N
-                    │          │         │
-        ┌───────────▼──┐    ┌──▼───────┐  ┌─────────────┐
-        │ Task {       │    │ async    │  │ TaskGroup   │
-        │   await      │    │ let      │  │ (loop)      │
-        │ }            │    │          │  │             │
-        └──────────────┘    └──────────┘  └─────────────┘
+    ┌─────────────────────────────────────┐
+    │ É operação ASSÍNCRONA?              │
+    │ (rede, BD, I/O)                     │
+    └──────────────┬──────────────────────┘
+                   │ SIM
+          ┌────────▼────────┐
+          │ É UI?           │── NÃO ──→ Trata no background
+          │ (ViewModel)     │
+          └──────┬──────┬───┘
+                SIM    NÃO
+                 │      │
+         ┌───────▼─┐  ┌─▼─────────────┐
+         │@MainActor│  │ Quantas ops? │
+         │          │  └──┬─┬┬─┬──────┘
+         └──────────┘    │ ││ │
+                    ┌────┘ │││ └─────┐
+                    │      ││ └──────┼────┐
+                   1     2-4 N      actor │
+                    │      │  │          │
+        ┌───────┬───┴──┐ ┌──┴─────┐ ┌───▼────┐
+        │ Task  │async │ │TaskGroup│ │ Actor  │
+        └───────┴───┬──┘ └────┬────┘ └────┬───┘
+                    └────┬────┘           │
+                    (juntos no main)      │
+                                    (proteção state)
 
 ┌──────────────────────────────────────────────┐
 │           RESUMO RÁPIDO                      │
 ├──────────────────────────────────────────────┤
-│ UI?                 → @MainActor             │
+│ UI?                 → @MainActor (seguro)    │
 │ 1 operação?         → Task { await }         │
-│ 2-4 operações?      → async let              │
-│ Array de operações? → TaskGroup              │
-│ Muitas threads?     → actor                  │
+│ 2-4 operações?      → async let (paralelo)   │
+│ Array de operações? → TaskGroup (loop)       │
+│ Múltiplas threads?  → actor (isolamento)     │
 └──────────────────────────────────────────────┘
 ```
 
