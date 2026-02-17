@@ -20,17 +20,100 @@
 8. [Arquitetura com Actors - Granularidade](#arquitetura-com-actors---granularidade)
 9. [Sendable - Garantindo Thread-Safety](#sendable---garantindo-thread-safety)
 10. [Cancelamento de Tasks](#cancelamento-de-tasks)
-11. [AsyncSequence e Streaming](#asyncsequence-e-streaming)
-12. [Debouncing com Task.sleep](#debouncing-com-tasksleep)
-13. [TaskGroup - Paralelismo Avançado](#taskgroup---paralelismo-avançado)
-14. [Threads vs Actors - Por Baixo dos Panos](#threads-vs-actors---por-baixo-dos-panos)
-15. [Memory Management](#memory-management)
-16. [Migrações - Do Antigo para o Novo](#migrações---do-antigo-para-o-novo)
-17. [🐛 Galeria de Bugs Comuns](#-galeria-de-bugs-comuns)
-18. [🎯 Problemas Comuns com Actors](#-problemas-comuns-com-actors)
-19. [Padrões do GhibliApp](#padrões-do-ghibliapp)
-20. [✅ Checklist de Revisão](#-checklist-de-revisão)
-21. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
+11. [🔍 Debugging & Xcode Practices](#-debugging--xcode-practices) **← NOVO!**
+12. [AsyncSequence e Streaming](#asyncsequence-e-streaming)
+13. [Debouncing com Task.sleep](#debouncing-com-tasksleep)
+14. [TaskGroup - Paralelismo Avançado](#taskgroup---paralelismo-avançado)
+15. [Threads vs Actors - Por Baixo dos Panos](#threads-vs-actors---por-baixo-dos-panos)
+16. [Memory Management](#memory-management)
+17. [Migrações - Do Antigo para o Novo](#migrações---do-antigo-para-o-novo)
+18. [🐛 Galeria de Bugs Comuns](#-galeria-de-bugs-comuns)
+19. [🎯 Problemas Comuns com Actors](#-problemas-comuns-com-actors)
+20. [Padrões do GhibliApp](#padrões-do-ghibliapp)
+21. [✅ Checklist de Revisão](#-checklist-de-revisão)
+22. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
+
+---
+
+## 🚀 Quick Start: Qual ferramenta usar?
+
+Confuso sobre qual padrão usar? Siga este fluxograma:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Preciso fazer algo ASSÍNCRONO?                     │
+│  (rede, banco de dados, I/O)                        │
+└────────────────┬────────────────────────────────────┘
+                 │
+        ┌────────▼────────┐
+        │     NÃO        │ → Use função síncrona normal
+        └────────────────┘
+                 │
+        ┌────────▼─────────────────────────────┐
+        │     É UI (ViewModel, View)?           │
+        │     (Modifica @State ou @Observable)  │
+        └────────┬────────────────┬─────────────┘
+                 │                │
+             │   SIM   │          │   NÃO
+             └────┬────┘          └────┬─────┐
+                  │                     │     │
+        ┌─────────▼─────────┐   ┌──────▼──┐  │
+        │ Use @MainActor    │   │ ✅      │  │
+        │ (automático!)     │   │         │  │
+        └───────────────────┘   │ Quantas │  │
+                                │ operações│ │
+                                │ assíncronas
+                                │ rodam?   │  │
+                                └──────┬──┘  │
+                         ┌────────────┼────┐│
+                         │            │    ││
+                      ┌──▼──┐    ┌───▼──┐ ││
+                      │ 1   │    │ 2-4  │ ││
+                      └──┬──┘    └───┬──┘ ││
+                         │          │    ││
+                    ┌────▼────┐┌───▼──┐┌─▼──────┐
+                    │ Task {  ││async │││TaskGroup
+                    │  await  │ let  │  (loop)
+                    │}        │      │ │
+                    └─────────┘└──────┘└────────┘
+
+┌──────────────────────────────┐
+│  RESUMO RÁPIDO:              │
+├──────────────────────────────┤
+│ UI?                  → @MainActor
+│ 1 operação?          → Task { await }
+│ 2-4 operações?       → async let
+│ Array de operações?  → TaskGroup
+│ Muitas threads?      → actor
+└──────────────────────────────┘
+```
+
+**Exemplos rápidos:**
+
+```swift
+// ✅ 1 operação
+Task {
+    data = try await fetchData()
+}
+
+// ✅ 2-4 operações
+async let films = fetchFilms()
+async let favorites = getFavorites()
+let (f, fav) = try await (films, favorites)
+
+// ✅ Array de operações
+try await withThrowingTaskGroup(of: Data.self) { group in
+    for url in urls {
+        group.addTask { try await download(url) }
+    }
+}
+
+// ✅ Protegendo estado mutável
+actor FileStorage {
+    private var cache: [String: Data] = [:]
+    func save(_ data: Data, key: String) async throws { ... }
+}
+```
 
 ---
 
@@ -89,19 +172,29 @@ class OldFilmsViewController: UIViewController {
 ### A Solução: Swift Concurrency
 
 ```swift
-// ✅ SWIFT CONCURRENCY - Código limpo e linear
+// ✅ SWIFT CONCURRENCY - Paralelismo com encadeamento
 @MainActor
-class FilmsViewModel {
-    func load() async {
-        state = .loading
-        
+class FilmDetailViewModel {
+    let film: Film
+    
+    func refreshAllSections(forceRefresh: Bool = false) async {
         do {
-            // ✅ Linear! Parece código síncrono
-            let films = try await fetchFilmsUseCase.execute()
-            let favorites = try await getFavoritesUseCase.execute()
+            // ✅ PARALELO: Todas começam AO MESMO TEMPO
+            // ✅ MAS encadeadas: todas DEPENDEM do mesmo `film`
+            async let people = try fetchPeopleUseCase.execute(for: film, forceRefresh: forceRefresh)
+            async let locations = try fetchLocationsUseCase.execute(for: film, forceRefresh: forceRefresh)
+            async let species = try fetchSpeciesUseCase.execute(for: film, forceRefresh: forceRefresh)
+            async let vehicles = try fetchVehiclesUseCase.execute(for: film, forceRefresh: forceRefresh)
+            
+            // ✅ Espera TODAS completarem (não sequencial!)
+            let (peopleData, locationsData, speciesData, vehiclesData) = 
+                try await (people, locations, species, vehicles)
             
             // ✅ Já está no @MainActor, sem DispatchQueue.main!
-            state = .loaded(makeContent(films: films, favorites: favorites))
+            charactersSectionViewModel.setItems(peopleData)
+            locationsSectionViewModel.setItems(locationsData)
+            speciesSectionViewModel.setItems(speciesData)
+            vehiclesSectionViewModel.setItems(vehiclesData)
         } catch {
             // ✅ Um único catch para todos os erros
             state = .error(.from(error))
@@ -112,10 +205,11 @@ class FilmsViewModel {
 
 **Benefícios:**
 1. ✅ **Código linear** - lê de cima para baixo como código síncrono
-2. ✅ **Type-safety** - compilador garante `await` onde necessário
-3. ✅ **Structured concurrency** - tarefas são organizadas hierarquicamente
-4. ✅ **Automatic thread safety** - `@MainActor` garante UI no main thread
-5. ✅ **Melhor performance** - suspende em vez de bloquear threads
+2. ✅ **Paralelismo + Encadeamento** - `async let` roda todas as tarefas JUNTAS, mas cada uma depende de `film`
+3. ✅ **Type-safety** - compilador garante `await` onde necessário
+4. ✅ **Structured concurrency** - tarefas são organizadas hierarquicamente
+5. ✅ **Automatic thread safety** - `@MainActor` garante UI no main thread
+6. ✅ **Melhor performance** - suspende em vez de bloquear threads
 
 ### O que Mudou?
 
@@ -3355,6 +3449,184 @@ deinit {
 - ✅ Cleanup assíncrono precisa rodar **após** deinit
 - ✅ `Task.detached` não herda contexto (que está sendo destruído)
 - ✅ Garante que streams terminam gracefully
+
+---
+
+## 🔍 Debugging & Xcode Practices
+
+### Thread Sanitizer - Detectando Data Races
+
+O **Thread Sanitizer** é sua primeira defesa contra data races. Ative-o:
+
+```
+Product > Scheme > Edit Scheme > Run > Diagnostics > Thread Sanitizer
+```
+
+**Exemplo: Detectar data race**
+
+```swift
+// ❌ CÓDIGO COM DATA RACE
+class Counter {
+    var value = 0 // ⚠️ Acesso de múltiplas threads!
+    
+    func increment() {
+        value += 1
+    }
+}
+
+let counter = Counter()
+
+Task {
+    counter.increment() // Thread A
+}
+
+Task {
+    counter.increment() // Thread B
+}
+
+// 🚨 THREAD SANITIZER OUTPUT:
+// ⚠️ WARNING: ThreadSanitizer: data race
+// Write of size 8 at 0x7b0400001234 by thread T2
+//   #0 Counter.increment[...]: counter-app/Counter.swift:4
+// Previous write of size 8 at 0x7b0400001234 by thread T1
+//   #0 Counter.increment[...]: counter-app/Counter.swift:4
+// 💥 Data race detected! Fix it com actor ou locks.
+```
+
+### Debugar Tasks com Xcode
+
+#### 1. Breakpoints em Tasks
+
+```swift
+// ✅ Adicione breakpoint aqui
+async let result = try await fetchData()  // 🔴 Breakpoint
+
+// Xcode mostrará:
+// - Thread atual (pode mudar entre suspensōes!)
+// - Call stack com informação de Task
+// - Variáveis locais
+```
+
+#### 2. Analisar Call Stack
+
+Quando parado num breakpoint dentro de uma Task:
+
+```
+Call Stack:
+  0  fetchData()
+  1  [Task 0x123] - ← Mostra qual Task está executando
+  2  FilmsViewModel.load()
+  3  FilmsView.task
+```
+
+#### 3. Conditional Breakpoints em Loops
+
+```swift
+for await event in eventStream {
+    // 🔴 Breakpoint CONDICIONAL: event != nil
+    handle(event)
+}
+```
+
+**Como criar:**
+1. Right-click no breakpoint
+2. "Edit Breakpoint..."
+3. Adicionar condição: `event != nil`
+
+### Detectar Retain Cycles com [weak self]
+
+```swift
+// ❌ RETAIN CYCLE POTENCIAL
+@MainActor
+class ViewModel {
+    private var task: Task<Void, Never>?
+    
+    func start() {
+        task = Task {
+            for await data in stream {
+                self.update(data) // ❌ Captura self! Pode reter ViewModel
+            }
+        }
+    }
+}
+
+// ✅ FIX: Use [weak self]
+func start() {
+    task = Task { [weak self] in
+        for await data in stream {
+            guard let self else { return }
+            self.update(data) // ✅ Seguro
+        }
+    }
+}
+```
+
+**Verificar memory leaks:**
+```
+Product > Build For > Profiling > Leaks (Instruments)
+```
+
+### Debugar com Print em async/await
+
+```swift
+func load() async {
+    print("1️⃣ Iniciando (Thread: \(Thread.current.name))")
+    
+    async let films = try await fetchFilms()
+    print("2️⃣ Films task criada")
+    
+    // Espera ambos
+    let filmsData = try await films
+    print("3️⃣ Films terminou (Thread: \(Thread.current.name))")
+    // ⚠️ Pode ser thread DIFERENTE!
+}
+```
+
+**Output esperado:**
+```
+1️⃣ Iniciando (Thread: main)
+2️⃣ Films task criada
+3️⃣ Films terminou (Thread: com.apple.root.default-qos.overcommit)
+// ⚠️ Thread mudou entre suspensōes! Isto é NORMAL
+```
+
+### Xcode Debugger: Inspecting Tasks
+
+Quando parado num breakpoint, inspecione no console:
+
+```swift
+// Ver info da task atual
+po Task.currentUnsafeTask()
+
+// Ver se foi cancelada
+po Task.isCancelled
+```
+
+### 🎯 Checklist: Problemas Comuns
+
+**❌ Problem: View aparece em branco, sem layout**
+- Provável: `@MainActor` faltando no ViewModel
+- Fix: Adicione `@MainActor` à classe
+
+**❌ Problem: Dados não atualizam na View**
+- Provável: Faltou `await` ou property não é observada
+- Fix: Use `@Observable` ou `@StateObject`
+
+**❌ Problem: App congela/freezes**
+- Provável: Operação síncrona pesada no main thread
+- Fix: Mova para `Task.detached { }`
+
+**❌ Problem: Memory leak aumenta com cada teste**
+- Provável: Retain cycle em Tasks
+- Fix: Adicione `[weak self]` em Task closures
+
+**❌ Problem: "Main thread checker" warnings**
+- Provável: Atualizando UI de background thread
+- Fix: Adicione `@MainActor` ou `await MainActor.run { }`
+
+**❌ Problem: TaskGroup nunca termina**
+- Provável: Esqueceu `await` no group.results
+- Fix: Sempre faça `try await group.reduce(...)`
 
 ---
 
