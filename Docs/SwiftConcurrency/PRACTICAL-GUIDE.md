@@ -40,41 +40,38 @@
 Confuso sobre qual padrão usar? Siga este fluxograma:
 
 ```
-    ┌─────────────────────────────────────┐
-    │ É operação ASSÍNCRONA?              │
-    │ (rede, BD, I/O)                     │
-    └──────────────┬──────────────────────┘
-                   │ SIM
-          ┌────────▼────────┐
-          │ É UI?           │── NÃO ──→ Trata no background
-          │ (ViewModel)     │
-          └──────┬──────┬───┘
-                SIM    NÃO
-                 │      │
-         ┌───────▼─┐  ┌─▼─────────────┐
-         │@MainActor│  │ Quantas ops? │
-         │          │  └──┬─┬┬─┬──────┘
-         └──────────┘    │ ││ │
-                    ┌────┘ │││ └─────┐
-                    │      ││ └──────┼────┐
-                   1     2-4 N      actor │
-                    │      │  │          │
-        ┌───────┬───┴──┐ ┌──┴─────┐ ┌───▼────┐
-        │ Task  │async │ │TaskGroup│ │ Actor  │
-        └───────┴───┬──┘ └────┬────┘ └────┬───┘
-                    └────┬────┘           │
-                    (juntos no main)      │
-                                    (proteção state)
+         ┌──────────────────────────┐
+         │ É operação ASSÍNCRONA?   │
+         │ (rede, BD, I/O)          │
+         └────────────┬─────────────┘
+                      │
+            ┌─────────▼────────┐
+            │ É UI (view/VM)?  │
+            └─────┬────────┬───┘
+                 SIM      NÃO
+                  │        │
+          ┌───────▼──┐  ┌──▼─────────────┐
+          │@MainActor│  │Quantas ops?    │
+          └──────────┘  └──┬──┬──┬───────┘
+                           │  │  │
+                    ┌──────┘  │  └───────┐
+                    │         │          │
+                   1       2-4          N
+                    │         │          │
+          ┌─────────▼┐  ┌─────▼──┐  ┌───▼─────┐
+          │  Task    │  │ async  │  │TaskGroup│
+          │ { await} │  │  let   │  │ (loop)  │
+          └──────────┘  └────────┘  └─────────┘
 
-┌──────────────────────────────────────────────┐
-│           RESUMO RÁPIDO                      │
-├──────────────────────────────────────────────┤
-│ UI?                 → @MainActor (seguro)    │
-│ 1 operação?         → Task { await }         │
-│ 2-4 operações?      → async let (paralelo)   │
-│ Array de operações? → TaskGroup (loop)       │
-│ Múltiplas threads?  → actor (isolamento)     │
-└──────────────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
+│            ESCOLHER A FERRAMENTA              │
+├───────────────────────────────────────────────┤
+│ UI Thread?          → @MainActor              │
+│ Uma operação?       → Task { await }          │
+│ Poucas operações?   → async let               │
+│ Lista/Array?        → TaskGroup + loop        │
+│ Proteção state?     → actor                   │
+└───────────────────────────────────────────────┘
 ```
 
 **Exemplos rápidos:**
@@ -218,12 +215,12 @@ class FilmDetailViewModel {
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│              ANTES: Bloqueio (ruim! 😱)                    │
+│              ANTES: Bloqueio (ruim! 😱)                     │
 │                                                            │
-│  Thread ████████████████████████████ (bloqueada!)         │
+│  Thread ████████████████████████████ (bloqueada!)          │
 │         wait.....................                          │
 │                                                            │
-│  A thread fica travada esperando, desperdiçando recursos  │
+│  A thread fica travada esperando, desperdiçando recursos   │
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
@@ -232,11 +229,11 @@ class FilmDetailViewModel {
 │  Thread ████                   ████████                    │
 │         └─ suspend         resume ─┘                       │
 │                │                │                          │
-│                └─ disponível ───┘   (thread livre!)       │
+│                └─ disponível ───┘   (thread livre!)        │
 │                   para outras                              │
 │                   tarefas                                  │
 │                                                            │
-│  A thread pode fazer outras coisas enquanto espera!       │
+│  A thread pode fazer outras coisas enquanto espera!        │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -998,35 +995,33 @@ func loadDashboard(sections: [Section]) async throws {
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│              THREADING MODEL (Antes)                       │
+│         THREADING MODEL (Antes: GCD)                       │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  DispatchQueue.global().async { }                          │
 │       ↓                                                    │
-│  Cria/usa thread do pool                                   │
+│  Cria/usa thread dedicada                                  │
 │       ↓                                                    │
-│  Thread 1: ████████████ (dedicada)                         │
-│  Thread 2: ████████████ (dedicada)                         │
-│  Thread 3: ████████████ (dedicada)                         │
+│  Thread 1: ████████████ (bloqueada!)                       │
+│  Thread 2: ████████████ (bloqueada!)                       │
+│  Thread 3: ████████████ (bloqueada!)                       │
 │                                                            │
-│  Problema: Muitas threads = overhead!                      │
+│  ❌ Problema: 1:1 thread/task = overhead alto!             │
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
-│              ACTOR MODEL (Swift Concurrency)               │
+│       THREADING MODEL (Agora: Actor Pool)                  │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  actor MyActor { }                                         │
 │       ↓                                                    │
-│  Gerenciado por Executor                                   │
+│  Gerenciado por Executor inteligente                       │
 │       ↓                                                    │
-│  Executor usa Thread Pool otimizado                        │
-│       ↓                                                    │
-│  Thread 1: ██ ActorA ██ ActorB ██ ActorA                   │
-│  Thread 2: ██ ActorC ██ ActorB ██ ActorD                   │
-│  Thread 3: ██ ActorD ██ ActorA ██ ActorC                   │
+│  Thread 1: █A█ █B█ █A█ █C█ (compartilhada!)               │
+│  Thread 2: █C█ █B█ █D█ █B█ (eficiente!)                   │
+│  Thread 3: █D█ █A█ █C█ █D█ (reutilizada!)                 │
 │                                                            │
-│  Benefício: Thread reuse = eficiência! ✅                  │
+│  ✅ Benefício: N:M (eficiência + reuse!)                   │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -2224,11 +2219,11 @@ class FilmsRepository {
 }
 
 // Cenário problema:
-// Task 1: Lê cachedFilms (nil) ─────────────────┐
-// Task 2: Lê cachedFilms (nil) ──────┐          │
-//                                     │          │
-// Task 1: Escreve cachedFilms ←──────┘          │
-// Task 2: Escreve cachedFilms ←─────────────────┘
+// Task 1: Lê cachedFilms (nil) ────────────┐
+// Task 2: Lê cachedFilms (nil) ─────┐      │
+//                                    │      │
+// Task 1: Escreve cachedFilms ←──────┘      │
+// Task 2: Escreve cachedFilms ←─────────────┘
 // 💥 Última escrita vence, pode perder dados!
 ```
 
@@ -3176,25 +3171,25 @@ class ViewModel: Sendable { // ✅ @MainActor = Sendable!
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
 │  ✅ Sendable automático:                                 │
-│    • Value types (struct, enum) imutáveis               │
-│    • Actors                                             │
-│    • @MainActor classes                                 │
-│    • Int, String, Bool, Array<Sendable>, etc.          │
+│    • Value types (struct, enum) imutáveis                │
+│    • Actors                                              │
+│    • @MainActor classes                                  │
+│    • Int, String, Bool, Array<Sendable>, etc.            │
 │                                                          │
 │  ❌ NÃO Sendable:                                        │
-│    • Classes sem isolamento                             │
-│    • NSObject subclasses                                │
-│    • Closures capturando estado mutável                 │
+│    • Classes sem isolamento                              │
+│    • NSObject subclasses                                 │
+│    • Closures capturando estado mutável                  │
 │                                                          │
 │  ⚠️ @unchecked Sendable:                                 │
-│    • Use apenas se implementou thread-safety manual     │
-│    • Locks, queues, atomic operations                   │
+│    • Use apenas se implementou thread-safety manual      │
+│    • Locks, queues, atomic operations                    │
 │                                                          │
 │  🎯 Onde importa:                                        │
-│    • Actor methods com parâmetros                       │
-│    • Task.detached { }                                  │
-│    • @Sendable closures                                 │
-│    • Generics atravessando actor boundaries             │
+│    • Actor methods com parâmetros                        │
+│    • Task.detached { }                                   │
+│    • @Sendable closures                                  │
+│    • Generics atravessando actor boundaries              │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -3712,26 +3707,23 @@ var connectivityStream: AsyncStream<Bool> {
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                  ConnectivityMonitor                       │
+│            ConnectivityMonitor (AsyncSequence)             │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  NWPathMonitor ─► pathUpdateHandler                        │
 │       │                    │                               │
 │       │ network change     │                               │
 │       ▼                    ▼                               │
-│  [Connected]  ─────► storage.continuations()              │
-│                           └─► yield(true) ───┐             │
-│                                              │             │
-│  [Disconnected] ─────► storage.continuations() │           │
-│                           └─► yield(false) ──┘             │
-│                                              │             │
-├──────────────────────────────────────────────┼─────────────┤
-│                                              │             │
-│  ViewModel 1: for await isOnline in stream ◄─┤             │
-│  ViewModel 2: for await isOnline in stream ◄─┤             │
-│  ViewModel 3: for await isOnline in stream ◄─┘             │
+│  [Connected]  ─────► continuations.yield(true) ────┐       │
+│  [Disconnected] ────► continuations.yield(false) ───┤      │
+│                                                     │      │
+├─────────────────────────────────────────────────────┼──────┤
+│                                                     │      │
+│  ViewModel 1: for await isOnline ◄─────────────────┤       │
+│  ViewModel 2: for await isOnline ◄─────────────────┤       │
+│  ViewModel 3: for await isOnline ◄─────────────────┘       │
 │                                                            │
-│  ✅ Múltiplos consumers recebem mesmo evento!              │
+│  ✅ Múltiplos receivers, 1 source!                          │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -5592,9 +5584,9 @@ Use este checklist ao revisar código com Swift Concurrency:
 │                                                             │
 │  UI streaming?           → for await in AsyncSequence       │
 │  Debounce search?        → Task.sleep(400ms)                │
-│  Long-running task?      → [weak self] + cancel em deinit  │
+│  Long-running task?      → [weak self] + cancel em deinit   │
 │                                                             │
-│  UI updates?             → Sempre em @MainActor            │
+│  UI updates?             → Sempre em @MainActor             │
 │  Estado compartilhado?   → actor                            │
 │  Errors?                 → throws, não Result               │
 └─────────────────────────────────────────────────────────────┘
