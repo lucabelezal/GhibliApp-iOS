@@ -30,9 +30,10 @@
 18. [🐛 Galeria de Bugs Comuns](#-galeria-de-bugs-comuns)
 19. [🎯 Problemas Comuns com Actors](#-problemas-comuns-com-actors)
 20. [🎓 Guia de Migração: De UIKit Para Swift Concurrency](#-guia-de-migração-de-uikit-para-swift-concurrency) **← NOVO!**
-21. [Padrões do GhibliApp](#padrões-do-ghibliapp)
-22. [✅ Checklist de Revisão](#-checklist-de-revisão)
-23. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
+21. [📍 Guia Completo de Anotações em 2026](#-guia-completo-de-anotações-em-2026) **← NOVO!**
+22. [Padrões do GhibliApp](#padrões-do-ghibliapp)
+23. [✅ Checklist de Revisão](#-checklist-de-revisão)
+24. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
 
 ---
 
@@ -5924,6 +5925,493 @@ actor FilmRepository {
 - ✅ Automático main thread dispatch
 - ✅ Tasks cancelam ao sair da view
 - ✅ Código mais testável
+
+---
+
+## 📍 Guia Completo de Anotações em 2026
+
+> **Contexto:** Swift 5.5 (2021) vs Swift 6.2 (2026) - Mudanças, o que é obrigatório e boas práticas HOJE
+
+### @MainActor - A Evolução
+
+#### Swift 5.5-5.9 (Antigo):
+```swift
+// ⚠️ Era recomendado mas não obrigatório
+@MainActor
+class ViewModel {
+    var items: [Item] = []
+    func update() async { }
+}
+```
+
+#### Swift 6.0+ (Moderno - 2026):
+```swift
+// ✅ PRATICAMENTE OBRIGATÓRIO em Swift 6 language mode
+// Compilador avisa/erra se faltar
+@MainActor
+final class ViewModel {
+    var items: [Item] = []
+    func update() async { }
+}
+```
+
+**O que mudou?**
+
+| Aspecto | Swift 5.x | Swift 6.2 |
+|---------|-----------|----------|
+| **@MainActor em classe UI** | ⚠️ Recomendado | ✅ Obrigatório |
+| **@MainActor em métodos** | ⚠️ Opcional | ✅ Verificado |
+| **Acesso cross-actor** | ⚠️ Warnings | ✅ Erros |
+| **Sem @MainActor em @Observable** | ❌ Pode crashar | ⚠️ Warnings fortes |
+| **Language mode default** | Permissivo (5.x) | Strict (6.2) |
+
+---
+
+### Onde Colocar @MainActor (2026)
+
+#### ✅ **OBRIGATÓRIO em 2026:**
+
+```swift
+// 1️⃣ Classes que modificam UI (SwiftUI ViewModel)
+@MainActor
+@Observable
+final class FilmsViewModel {
+    var films: [Film] = []
+    
+    func load() async {
+        films = try await repository.fetchAll() // ✅ Safe
+    }
+}
+
+// 2️⃣ UIKit ViewControllers (com Swift 6)
+@MainActor
+final class FilmsViewController: UIViewController {
+    override func viewDidLoad() async {
+        await viewModel.load()
+        tableView.reloadData() // ✅ Garantido main thread
+    }
+}
+
+// 3️⃣ @Observable classes que afetam UI
+@MainActor
+@Observable
+final class AppState {
+    var user: User?
+    var isAuthenticated = false
+}
+
+// 4️⃣ Métodos que SEMPRE precisam ser no main thread
+@MainActor
+final class NotificationManager {
+    func post(notification: NSNotification.Name) {
+        // ✅ Sempre main thread
+    }
+}
+```
+
+#### ⚠️ **RECOMENDADO (mas não obrigatório):**
+
+```swift
+// 1️⃣ Propriedades específicas (não toda classe)
+final class DataManager {
+    @MainActor var displayName: String = ""
+    var backendData: Data? = nil // Background OK
+    
+    @MainActor
+    func updateDisplay(_ name: String) {
+        self.displayName = name
+    }
+}
+
+// 2️⃣ Structs View (SwiftUI)
+// ❌ Não precisa - SwiftUI já garante
+struct FilmsView: View {
+    @State var viewModel = FilmsViewModel() // Não faça @MainActor
+    
+    var body: some View {
+        List(viewModel.films) { film in
+            Text(film.title) // ✅ Já no main thread
+        }
+    }
+}
+```
+
+#### ❌ **NÃO FAZER (Erros Comuns):**
+
+```swift
+// ❌ 1 - @MainActor em struct View
+@MainActor // Inutilizado!
+struct FilmsView: View {
+    var body: some View { }
+}
+
+// ❌ 2 - @MainActor em repository/actor
+@MainActor // ERRADO!
+actor FilmsRepository {
+    // Actors NÃO precisam de @MainActor
+    // Eles já fazem isolamento de thread!
+}
+
+// ✅ CORRETO:
+actor FilmsRepository {
+    func fetch() async throws -> [Film] {
+        // Roda em background, não precisa @MainActor
+    }
+}
+
+// ❌ 3 - Esquecer em @Observable que atualiza UI
+@Observable // ⚠️ PERIGOSO em Swift 6!
+class FilterViewModel {
+    var selectedGenre: String = ""
+    
+    func updateGenre(_ genre: String) async {
+        selectedGenre = genre // Pode não estar no main!
+    }
+}
+
+// ✅ CORRETO:
+@MainActor // Obrigatório!
+@Observable
+class FilterViewModel {
+    var selectedGenre: String = ""
+    
+    func updateGenre(_ genre: String) async {
+        selectedGenre = genre // ✅ Garantido main
+    }
+}
+```
+
+---
+
+### @Sendable - A Evolução
+
+#### Swift 5.5-5.9:
+```swift
+// ⚠️ Era silencioso (não compilava erro)
+let closure: @escaping () -> Void = {
+    // Pode capturar non-Sendable types
+    print(nonSendableObject.value) // ⚠️ Warning, não erro
+}
+```
+
+#### Swift 6.0+ (Strict Mode):
+```swift
+// ✅ ERRO em compile time se não for Sendable
+let closure: @escaping @Sendable () -> Void = {
+    // ✅ Só pode capturar tipos Sendable
+    print(sendableObject.value)
+}
+```
+
+---
+
+### Onde Colocar @Sendable (2026)
+
+#### ✅ **OBRIGATÓRIO (Swift 6 mode):**
+
+```swift
+// 1️⃣ Closures que atravessam actor boundaries
+func loadData(completion: @escaping @Sendable (Result<[Film], Error>) -> Void) {
+    Task {
+        let result = try await fetch()
+        completion(result) // ✅ Pode ser chamado de qualquer thread
+    }
+}
+
+// 2️⃣ AsyncSequence custom
+actor FilmsStream {
+    func makeAsyncStream() -> AsyncStream<Film> {
+        AsyncStream<Film> { continuation in
+            Task {
+                for film in await fetchFilms() {
+                    continuation.yield(film) // ✅ @Sendable implícito
+                }
+            }
+        }
+    }
+}
+
+// 3️⃣ Task.detached closures (que desprendem do contexto)
+Task.detached { @Sendable in
+    // ✅ Deve ser Sendable - não captura contexto pai
+    print(sendableData)
+}
+
+// 4️⃣ Notificação handlers
+NotificationCenter.default.addObserver(
+    forName: UIApplication.didBecomeActiveNotification,
+    object: nil,
+    queue: .main
+) { @Sendable notification in
+    // ✅ Closure precisa ser Sendable
+    handleAppBecameActive()
+}
+```
+
+#### ❌ **NÃO FAZER:**
+
+```swift
+// ❌ 1 - @Sendable com capture de non-Sendable
+class UserManager { }
+
+let manager = UserManager() // Não é Sendable
+let closure: @Sendable () -> Void = {
+    manager.logout() // ❌ ERRO - não é Sendable!
+}
+
+// ✅ CORRETO:
+actor UserManager {
+    func logout() { }
+}
+
+let manager = UserManager()
+let closure: @Sendable () -> Void = {
+    Task { await manager.logout() } // ✅ Actor é Sendable
+}
+```
+
+---
+
+### nonisolated - A Evolução e Uso
+
+#### Swift 5.5-5.9:
+```swift
+// ⚠️ Raramente usado
+actor Repository {
+    nonisolated func helper() { } // Ignorado na maioria
+}
+```
+
+#### Swift 6.0+ (Recomendado Fortemente):
+```swift
+// ✅ IMPORTANTE para performance
+@MainActor
+class ViewModel {
+    var items: [Item] = []
+    
+    // ✅ Roda NO MAIN THREAD
+    func updateUI() {
+        tableView.reloadData()
+    }
+    
+    // ✅ NÃO roda no main - mais rápido!
+    nonisolated func processData(_ data: Data) -> [Item] {
+        return heavyComputation(data)
+    }
+}
+```
+
+---
+
+### Onde Colocar nonisolated (2026)
+
+#### ✅ **USE (Performance):**
+
+```swift
+// 1️⃣ CPU-intensive work sem side effects
+@MainActor
+class ImageProcessor {
+    var images: [UIImage] = []
+    
+    // ⚡ NÃO roda em main thread - performance crítica
+    nonisolated func processImage(_ image: UIImage) -> UIImage {
+        return applyFilters(image) // Pesado!
+    }
+    
+    // ✅ Roda em main thread - atualiza UI
+    func addProcessedImage(_ image: UIImage) {
+        images.append(image)
+    }
+}
+
+// 2️⃣ Funções utilitárias estáticas
+@MainActor
+class ViewModel {
+    // ⚡ Static nonisolated - sem overhead
+    nonisolated static func formatDate(_ date: Date) -> String {
+        return DateFormatter().string(from: date)
+    }
+}
+
+// 3️⃣ Propriedades computed que não acessam state
+actor Repository {
+    nonisolated var apiVersion: String {
+        return "v1" // Constant, sem access
+    }
+}
+
+// 4️⃣ Métodos que querem ser sync sem herdar contexto
+@MainActor
+class ViewModel {
+    var state: AppState = .idle
+    
+    // ✅ Pode ser chamado de qualquer lugar, não bloqueia
+    nonisolated func shouldShowLoading() -> Bool {
+        return true // Não acessa state
+    }
+}
+```
+
+#### ❌ **NÃO USE:**
+
+```swift
+// ❌ 1 - nonisolated acessando propriedades do actor
+@MainActor
+class ViewModel {
+    var items: [Item] = []
+    
+    nonisolated func getItemCount() -> Int {
+        return items.count // ❌ ERRO - acessa state!
+    }
+}
+
+// ✅ CORRETO:
+@MainActor
+class ViewModel {
+    var items: [Item] = []
+    
+    func getItemCount() -> Int {
+        return items.count // ✅ Com isolamento
+    }
+}
+
+// ❌ 2 - nonisolated em função que modifica UI
+@MainActor
+class ViewController: UIViewController {
+    nonisolated func updateUI() { // ❌ Errado!
+        label.text = "Updated"
+    }
+}
+
+// ✅ CORRETO:
+@MainActor
+class ViewController: UIViewController {
+    func updateUI() {
+        label.text = "Updated"
+    }
+}
+```
+
+---
+
+### @Observable vs @State (SwiftUI 2026)
+
+#### Swift 5.9-6.0:
+```swift
+// ⚠️ Padrão antigo ainda funciona
+@StateObject
+var viewModel = ViewModel()
+```
+
+#### Swift 6.2+ (Recomendado):
+```swift
+// ✅ NOVO padrão mais simples
+@State
+var viewModel = ViewModel() // Se ViewModel é @Observable
+```
+
+**Por que mudar?**
+- ✅ Menos anotações
+- ✅ Mais simples
+- ✅ Menos conform protocols
+- ✅ Melhor performance
+
+---
+
+## Checklist Visual 2026
+
+```
+Você está criando uma classe que atualiza UI?
+│
+├─ SwiftUI View?
+│  └─ @Observable + @MainActor ✅
+│
+├─ UIViewController?
+│  └─ @MainActor + async/await ✅
+│
+├─ Repository/Actor?
+│  └─ actor (sem @MainActor) ✅
+│
+├─ Closure que ativa de fundo?
+│  └─ @Sendable ✅
+│
+├─ Função com CPU pesado em actor?
+│  └─ nonisolated ✅
+│
+└─ Property que não precisa isolamento?
+   └─ nonisolated ✅
+```
+
+---
+
+## Tabela de Referência Rápida (2026)
+
+| Anotação | Swift 5.x | Swift 6.2 | Onde? | Por quê? |
+|----------|-----------|----------|-------|---------|
+| `@MainActor` | ⚠️ Opcional | ✅ Obrigatório | ViewController, @Observable, ViewModel | UI safety |
+| `@Sendable` | ⚠️ Opcional | ✅ Obrigatório | Closures cross-actor | Thread safety |
+| `nonisolated` | ⚠️ Raro | ✅ Recomendado | Funções pesadas sem state | Performance |
+| `@Observable` | ✨ Novo (5.9) | ✅ Padrão | ViewModel SwiftUI | Simplicidade |
+| `@State` | ✅ Clássico | ✅ Com @Observable | SwiftUI View | Simplest |
+| `@StateObject` | ✅ Swift 5.x | ⚠️ Deprecated | Evitar em 6.2 | Simplicidade |
+| `async/await` | ✅ Swift 5.5+ | ✅ Obrigatório | Toda operação I/O | Código linear |
+| `actor` | ✅ Swift 5.5+ | ✅ Obrigatório | Repository, Services | Data race safety |
+
+---
+
+## Exemplo Completo 2026: Padrão Recomendado
+
+```swift
+// ✅ ViewModel SwiftUI moderno
+@MainActor
+@Observable
+final class FilmsViewModel {
+    var films: [Film] = []
+    var isLoading = false
+    var error: Error?
+    
+    private let repository: FilmsRepository // actor
+    
+    // ✅ CPU-heavy, não acessa state
+    nonisolated private func filterFilms(_ all: [Film], by genre: String) -> [Film] {
+        return all.filter { $0.genre == genre }
+    }
+    
+    // ✅ async/await obrigatório
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            films = try await repository.fetchAll()
+            error = nil
+        } catch {
+            self.error = error
+        }
+    }
+}
+
+// ✅ SwiftUI View
+struct FilmsView: View {
+    @State var viewModel = FilmsViewModel()
+    
+    var body: some View {
+        List(viewModel.films) { film in
+            Text(film.title)
+        }
+        .task { await viewModel.load() }
+    }
+}
+
+// ✅ Repository (actor, sem @MainActor)
+actor FilmsRepository {
+    private let httpClient: URLSessionAdapter // actor
+    
+    func fetchAll() async throws -> [Film] {
+        try await httpClient.request(with: .films)
+    }
+}
+```
 
 ---
 
