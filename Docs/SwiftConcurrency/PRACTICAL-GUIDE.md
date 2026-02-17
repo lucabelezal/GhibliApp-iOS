@@ -63,15 +63,15 @@ Confuso sobre qual padrão usar? Siga este fluxograma:
           │ { await} │  │  let   │  │ (loop)  │
           └──────────┘  └────────┘  └─────────┘
 
-┌───────────────────────────────────────────────┐
-│            ESCOLHER A FERRAMENTA              │
-├───────────────────────────────────────────────┤
-│ UI Thread?          → @MainActor              │
-│ Uma operação?       → Task { await }          │
-│ Poucas operações?   → async let               │
-│ Lista/Array?        → TaskGroup + loop        │
-│ Proteção state?     → actor                   │
-└───────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│         ESCOLHER A FERRAMENTA                   │
+├─────────────────────────────────────────────────┤
+│ UI Thread?          → @MainActor                │
+│ Uma operação?       → Task { await }            │
+│ Poucas operações?   → async let                 │
+│ Lista/Array?        → TaskGroup + loop          │
+│ Proteção state?     → actor                     │
+└─────────────────────────────────────────────────┘
 ```
 
 **Exemplos rápidos:**
@@ -448,24 +448,24 @@ private func fetch(forceRefresh: Bool) async {
 **Por que async let é melhor?**
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    TIMELINE COMPARISON                        │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ❌ SEQUENCIAL (lento - 3 segundos):                         │
-│                                                              │
-│  ████████████ fetchFilms (2s)                                │
-│              ████ getFavorites (1s)                          │
-│                                                              │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ✅ PARALELO com async let (rápido - 2 segundos!):           │
-│                                                              │
-│  ████████████ fetchFilms (2s)                                │
-│  ████ getFavorites (1s)                                      │
-│                                                              │
-│  ⚡ 33% mais rápido!                                          │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                  TIMELINE COMPARISON                        │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ❌ SEQUENCIAL (lento - 3 segundos):                       │
+│                                                            │
+│  ████████████ fetchFilms (2s)                              │
+│              ████ getFavorites (1s)                        │
+│                                                            │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ✅ PARALELO com async let (rápido - 2 segundos!):         │
+│                                                            │
+│  ████████████ fetchFilms (2s)                              │
+│  ████ getFavorites (1s)                                    │
+│                                                            │
+│  ⚡ 33% mais rápido!                                        │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ### 🔍 Como Funciona Por Baixo dos Panos?
@@ -592,45 +592,45 @@ let data = try await result
 ### 🎯 Task vs Task.detached - Quando usar cada um?
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                     Task (98% dos casos)                      │
-├───────────────────────────────────────────────────────────────┤
-│                                                               │
-│  @MainActor                                                   │
-│  class ViewModel {                                            │
-│      func buttonTapped() {                                    │
-│          // ✅ Task herda @MainActor                           │
-│          Task {                                               │
-│              let data = await fetchData()                     │
-│              self.items = data  // ✅ Já no main thread!      │
-│          }                                                    │
-│      }                                                        │
-│  }                                                            │
-│                                                               │
-│  ✅ Herda: @MainActor, priority, task local values            │
-│  ✅ Cancela automaticamente se pai cancelar                   │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                Task (98% dos casos)                        │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  @MainActor                                                │
+│  class ViewModel {                                         │
+│      func buttonTapped() {                                 │
+│          // ✅ Task herda @MainActor                        │
+│          Task {                                            │
+│              let data = await fetchData()                  │
+│              self.items = data  // ✅ Já no main thread!   │
+│          }                                                 │
+│      }                                                     │
+│  }                                                         │
+│                                                            │
+│  ✅ Herda: @MainActor, priority, task local values         │
+│  ✅ Cancela automaticamente se pai cancelar                │
+└────────────────────────────────────────────────────────────┘
 
-┌───────────────────────────────────────────────────────────────┐
-│              Task.detached (2% dos casos)                     │
-├───────────────────────────────────────────────────────────────┤
-│                                                               │
-│  @MainActor                                                   │
-│  class ViewModel {                                            │
-│      func heavyWork() {                                       │
-│          // ⚠️ Task.detached NÃO herda @MainActor             │
-│          Task.detached {                                      │
-│              let result = processHugeFile() // Background!    │
-│              await MainActor.run {                            │
-│                  self.result = result // ✅ Volta pro main    │
-│              }                                                │
-│          }                                                    │
-│      }                                                        │
-│  }                                                            │
-│                                                               │
-│  ❌ NÃO herda contexto                                        │
-│  ⚠️ Precisa retornar manualmente ao MainActor                 │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│            Task.detached (2% dos casos)                    │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  @MainActor                                                │
+│  class ViewModel {                                         │
+│      func heavyWork() {                                    │
+│          // ⚠️ Task.detached NÃO herda @MainActor          │
+│          Task.detached {                                   │
+│              let result = processHugeFile() // Background! │
+│              await MainActor.run {                         │
+│                  self.result = result // ✅ Volta pro main │
+│              }                                             │
+│          }                                                 │
+│      }                                                     │
+│  }                                                         │
+│                                                            │
+│  ❌ NÃO herda contexto                                     │
+│  ⚠️ Precisa retornar manualmente ao MainActor              │
+└────────────────────────────────────────────────────────────┘
 ```
 
 **Quando usar Task.detached:**
@@ -2162,7 +2162,7 @@ Task {
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              ACTOR SERIALIZATION                        │
+│            ACTOR SERIALIZATION                          │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Task 1: increment() ──┐                               │
