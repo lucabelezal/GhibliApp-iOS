@@ -29,9 +29,10 @@
 17. [Migrações - Do Antigo para o Novo](#migrações---do-antigo-para-o-novo)
 18. [🐛 Galeria de Bugs Comuns](#-galeria-de-bugs-comuns)
 19. [🎯 Problemas Comuns com Actors](#-problemas-comuns-com-actors)
-20. [Padrões do GhibliApp](#padrões-do-ghibliapp)
-21. [✅ Checklist de Revisão](#-checklist-de-revisão)
-22. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
+20. [🎓 Guia de Migração: De UIKit Para Swift Concurrency](#-guia-de-migração-de-uikit-para-swift-concurrency) **← NOVO!**
+21. [Padrões do GhibliApp](#padrões-do-ghibliapp)
+22. [✅ Checklist de Revisão](#-checklist-de-revisão)
+23. [🎯 Cheat Sheet - Decisão Rápida](#-cheat-sheet---decisão-rápida)
 
 ---
 
@@ -599,7 +600,7 @@ let data = try await result
 │  @MainActor                                                │
 │  class ViewModel {                                         │
 │      func buttonTapped() {                                 │
-│          // ✅ Task herda @MainActor                        │
+│           // ✅ Task herda @MainActor                       │
 │          Task {                                            │
 │              let data = await fetchData()                  │
 │              self.items = data  // ✅ Já no main thread!   │
@@ -1524,6 +1525,132 @@ final class SearchViewModel {
 3. ✅ **Debounce** com `Task.sleep`
 4. ✅ **Cancela anterior** antes de criar nova task
 5. ✅ **[weak self]** evita retain cycle
+
+### ⚠️ Detalhe Crítico: Contextos Isolados vs Não-Isolados
+
+> **⚠️ Armadilha Comum:** `@MainActor` em funções **síncronas** NÃO garante garantia de main thread se chamado de um **contexto não-isolado**!
+
+**O que é um contexto não-isolado?**
+- Funções síncronas sem actor
+- Código rodando em background thread (fora de um actor/MainActor)
+- Calls via `DispatchQueue.global()`
+
+**Problema em Swift 5 (sem garantias):**
+
+```swift
+// ❌ INSEGURO: Função sync com @MainActor
+@MainActor
+func updateUI() {  // Sem 'async'!
+    // ⚠️ Pode NÃO estar no main thread se chamado de background!
+    self.label.text = "Loaded"
+}
+
+// Chamando de contexto não-isolado:
+DispatchQueue.global().async {
+    updateUI()  // ⚠️ CRASH! Executou em background!
+}
+```
+
+**Solução: Sempre use `async`**
+
+```swift
+// ✅ SEGURO: Função async com @MainActor
+@MainActor
+async func updateUI() {
+    // ✅ Garantido no main thread mesmo se chamado de background
+    self.label.text = "Loaded"
+}
+
+// Chamando (sempre com await):
+DispatchQueue.global().async {
+    await updateUI()  // ✅ Dispara para main thread automaticamente
+}
+```
+
+**Swift 6 mode avisa em compile time:**
+- Swift 5 mode: Compila e pode crashar em runtime ⚠️
+- Swift 6 mode: Erro em compile time ✅
+
+**Regra de Ouro:**
+```swift
+// ❌ NUNCA: Funções síncronas @MainActor
+@MainActor
+func doSomething() { }  // Evitar!
+
+// ✅ SEMPRE: Funções assíncronas @MainActor
+@MainActor
+async func doSomething() { }  // Correto!
+```
+
+### Otimizando com `nonisolated`
+
+Métodos que **NÃO precisam de main thread** podem ser marcados `nonisolated` para rodar mais rápido sem overhead:
+
+```swift
+@MainActor
+class ViewModel {
+    // ✅ Roda no main thread (atualiza UI)
+    async func updateUI(data: String) {
+        label.text = data
+    }
+    
+    // ⚡ NÃO herda @MainActor - roda rápido no background!
+    nonisolated func processHeavyData(_ data: Data) -> String {
+        // CPU-intensive, sem UI
+        // Não espera pelo main thread
+        return expensiveCalculation(data)
+    }
+}
+```
+
+**Quando usar `nonisolated`:**
+- ✅ Processamento de dados pesado (sem UI)
+- ✅ Cálculos matemáticos/lógicos
+- ✅ Transformações de dados
+- ✅ Parsing de JSON
+
+### MainActor.run { } - Executar apenas um trecho no main thread
+
+Às vezes você quer rodar **apenas parte** do código no main thread:
+
+```swift
+@MainActor
+func load() async {
+    // Trabalho pesado em background
+    let data = await Task.detached {
+        return await fetchData()  // Background
+    }.value
+    
+    // ✅ Só este trecho vai ao main thread
+    await MainActor.run {
+        self.updateUI(with: data)
+    }
+}
+```
+
+**Implementação alternativa:**
+
+```swift
+// Sem @MainActor na função
+func load() async {
+    let data = await fetchData()  // Background
+    
+    // ✅ Dispara UI update ao main thread
+    await MainActor.run {
+        self.label.text = data
+        self.isLoading = false
+    }
+}
+```
+
+**MainActor.run vs @MainActor:**
+
+| Aspecto | @MainActor | MainActor.run |
+|---------|-----------|--------------|
+| **Escopo** | Toda função/classe | Apenas o bloco |
+| **Performance** | Overhead menor | Pequeno overhead |
+| **Uso** | Classes/ViewModels | Trechos pontuais |
+| **Exemplo** | `@MainActor class ViewModel` | `await MainActor.run { }` |
 
 ---
 
@@ -5300,6 +5427,503 @@ final class ActorTests: XCTestCase {
 7. [ ] Init async (use factory)
 8. [ ] Global actors para features (over-engineering)
 ```
+
+---
+
+## 🎓 Guia de Migração: De UIKit Para Swift Concurrency
+
+> **Direcionado para:** Developers vindos de UIViewController, DispatchQueue, completion handlers  
+> **Objetivo:** Abraçar Swift Concurrency mantendo patterns UIKit
+
+### Os 5 Maiores Erros que UIKit Developers Fazem
+
+#### ❌ Erro #1: Tentar Usar Completion Handlers com async/await
+
+**O Velhinho Jeito (UIKit Legacy):**
+
+```swift
+// ❌ PADRÃO ANTIGO - Completion handlers
+class FilmViewController: UIViewController {
+    func loadFilms() {
+        showSpinner()
+        
+        let repository = FilmsRepository()
+        repository.fetchFilms { [weak self] result in
+            DispatchQueue.main.async { // Manual!
+                defer { self?.hideSpinner() }
+                
+                switch result {
+                case .success(let films):
+                    self?.updateUI(with: films)
+                case .failure(let error):
+                    self?.showError(error)
+                }
+            }
+        }
+    }
+}
+```
+
+**O Novo Jeito (Swift Concurrency):**
+
+```swift
+// ✅ PADRÃO MODERNO - async/await
+class FilmViewController: UIViewController {
+    let viewModel: FilmsViewModel
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // ✅ .task cria Task automaticamente e cancela ao desaparecer
+        Task { [weak self] in
+            await self?.loadFilms()
+        }
+    }
+    
+    private func loadFilms() async {
+        showSpinner()
+        
+        do {
+            let films = try await viewModel.fetchFilms()
+            updateUI(with: films) // ✅ Já no main thread!
+        } catch {
+            showError(error)
+        }
+        
+        hideSpinner()
+    }
+    
+    private func updateUI(with films: [Film]) {
+        // ✅ Automáticamente no main thread (ViewModel é @MainActor)
+        tableView.reloadData()
+    }
+}
+```
+
+**Diferenças-chave:**
+
+| UIKit Legacy | Swift Concurrency |
+|-------------|------------------|
+| `completion: @escaping (Result<T, E>) -> ()` | `async throws -> T` |
+| `DispatchQueue.main.async { }` | `@MainActor` (automático) |
+| Manual error handling | `try/catch` ou `try?` |
+| Fácil esquecer cleanup | Tasks auto-cancelam |
+| Hierarquia complexa de callbacks | Código linear, sequencial |
+
+---
+
+#### ❌ Erro #2: Tentar Atualizar UI Sem Estar no Main Thread
+
+**O Problema (UIKit Thinking):**
+
+```swift
+// ❌ PADRÃO PERIGOSO
+class FilmViewController: UIViewController {
+    func loadData() {
+        Task.detached { // ⚠️ Detached = sem @MainActor!
+            let films = await API.fetchFilms()
+            
+            // 💥 CRASH! Não estamos no main thread
+            self.tableView.reloadData()
+        }
+    }
+}
+```
+
+**A Solução (Swift Concurrency Thinking):**
+
+```swift
+// ✅ PADRÃO CORRETO - Use @MainActor no ViewModel
+@MainActor
+final class FilmsViewController: UIViewController {
+    private let viewModel: FilmsViewModel
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        Task {
+            await loadData()
+        }
+    }
+    
+    private func loadData() async {
+        do {
+            let films = try await viewModel.fetchFilms()
+            // ✅ Automáticamente no main thread
+            tableView.reloadData()
+        } catch {
+            showError(error)
+        }
+    }
+}
+
+// ViewModel isola lógica complexa
+@MainActor
+final class FilmsViewModel {
+    private let repository: FilmsRepository // Actor
+    
+    func fetchFilms() async throws -> [Film] {
+        // ✅ Repository roda em background
+        // ✅ Retorna automáticamente ao @MainActor
+        try await repository.fetchAll()
+    }
+}
+```
+
+**Regra de Ouro:**
+- ✅ **UIViewController/UIView** → `@MainActor`
+- ✅ **ViewModel** → `@MainActor`
+- ⚡ **Repository/Service** → `actor` (background)
+
+---
+
+#### ❌ Erro #3: Confundir Task com Task.detached
+
+**O Padrão Errado:**
+
+```swift
+// ❌ ERRADO 98% das vezes
+@MainActor
+class ViewController: UIViewController {
+    func search(_ query: String) {
+        Task.detached { // ⚠️ DevConsideringFavoriteCase: Over-engineered!
+            let results = await self.viewModel.search(query)
+            // 💥 Erro: Não consegue acessar viewModel.state
+        }
+    }
+}
+```
+
+**O Padrão Correto:**
+
+```swift
+// ✅ CORRETO 98% das vezes
+@MainActor
+class ViewController: UIViewController {
+    func search(_ query: String) {
+        Task { // ✅ Herda @MainActor
+            let results = await self.viewModel.search(query)
+            // ✅ Acesso direto ao viewModel!
+            self.displayResults(results)
+        }
+    }
+}
+```
+
+**Quando Use Task.detached (2% dos casos):**
+
+```swift
+// ✅ Caso real: Work pesado sem herdar contexto
+@MainActor
+class ImageViewController: UIViewController {
+    func processLargeImage() {
+        showProgress()
+        
+        // Task.detached = não bloqueia main thread
+        let task = Task.detached { [weak self] () -> UIImage in
+            // CPU-intensive, NÃO @MainActor
+            return try await ImageProcessor.shared.processImage(self?.image)
+        }
+        
+        // Voltar ao main thread após
+        Task {
+            let result = try await task.value
+            await MainActor.run {
+                self.displayProcessedImage(result)
+            }
+        }
+    }
+}
+```
+
+---
+
+#### ❌ Erro #4: Esquecer [weak self] em Tasks de Longa Vida
+
+**O Padrão Perigoso:**
+
+```swift
+// ❌ MEMORY LEAK!
+@MainActor
+class MonitorViewController: UIViewController {
+    func startMonitoring() {
+        // Task retém self indefinidamente
+        Task { // ❌ Sem [weak self]
+            for await status in connectivityMonitor {
+                self.statusLabel.text = status.description
+            }
+        }
+        // ViewController is destroyed, Task continua! 💥 LEAK
+    }
+}
+```
+
+**O Padrão Seguro:**
+
+```swift
+// ✅ CORRETO
+@MainActor
+class MonitorViewController: UIViewController {
+    private var monitoringTask: Task<Void, Never>?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        startMonitoring()
+    }
+    
+    func startMonitoring() {
+        monitoringTask?.cancel() // Cancela anterior
+        
+        monitoringTask = Task { [weak self] in
+            for await status in connectivityMonitor {
+                guard !Task.isCancelled else { break }
+                guard let self else { return }
+                
+                self.statusLabel.text = status.description
+            }
+        }
+    }
+    
+    deinit {
+        monitoringTask?.cancel() // ✅ Cleanup!
+    }
+}
+```
+
+**Checklist:**
+- ✅ `for await` loops? Use `[weak self]`
+- ✅ Tasks que outlive a view? Armazene e cancele em `deinit`
+- ✅ Checo `Task.isCancelled` em loops?
+
+---
+
+#### ❌ Erro #5: Usar Thread.sleep em Vez de Task.sleep
+
+**O Antipadrão (UIKit Legacy):**
+
+```swift
+// ❌ CONGELA A UI!
+@MainActor
+class SearchViewController: UIViewController {
+    func debounceSearch(_ query: String) {
+        searchTask?.cancel()
+        
+        // 💥 Thread.sleep bloqueia a THREAD (incluindo main!)
+        Thread.sleep(forTimeInterval: 0.5)
+        
+        // A UI fica congelada por 500ms cada digitação
+        searchTask = Task {
+            await performSearch(query)
+        }
+    }
+}
+```
+
+**O Padrão Correto (Swift Concurrency):**
+
+```swift
+// ✅ SUSPENDE SEM BLOQUEAR
+@MainActor
+class SearchViewController: UIViewController {
+    private var searchTask: Task<Void, Never>?
+    
+    func debounceSearch(_ query: String) {
+        searchTask?.cancel()
+        
+        searchTask = Task { // ✅ Herda @MainActor
+            do {
+                // ✅ Task.sleep suspende sem bloquear
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                
+                guard !Task.isCancelled else { return }
+                
+                await performSearch(query)
+            } catch is CancelledError {
+                // Task foi cancelada (novo caractere digitado)
+            }
+        }
+    }
+}
+```
+
+**Diferença Visual:**
+
+```
+Thread.sleep (❌ Bloqueia):
+├─ Task 1: ████████ (bloqueado)
+└─ Task 2: ████ (bloqueado)
+   └─ Main thread CONGELADA! 💥
+
+Task.sleep (✅ Suspende):
+├─ Task 1: ██ sleep
+│  └─ Thread liberada!
+├─ Task 2: ████ outro trabalho
+├─ Task 1: ██ retoma
+└─ Task 2: ██ continua
+   ✅ Tudo roda suavemente!
+```
+
+---
+
+### Task.sleep vs Task.yield - Quando Usar Cada Um?
+
+#### **Task.sleep** - Aguarde por tempo fixo
+
+Use quando: Quer **pausar por um período específico**
+
+```swift
+// ✅ Debouncing (aguarde 400ms)
+searchTask = Task {
+    try await Task.sleep(nanoseconds: 400_000_000)
+    await search()
+}
+
+// ✅ Delays controlados
+await Task.sleep(nanoseconds: 1_000_000_000) // 1 segundo
+retryFetch()
+```
+
+**Assinatura:**
+```swift
+static func sleep<C: Clock>(_ duration: C.Instant.Duration) async throws
+```
+
+#### **Task.yield** - Ceda a thread para outras tasks
+
+Use quando: Quer **dar oportunidade** para outras tasks rodarem
+
+```swift
+// ✅ Loop pesado - deixe outras tasks rodar
+func processHugeDataset(items: [Int]) async {
+    for item in items {
+        await Task.yield() // ✅ Deixe outras tasks rodar!
+        heavyCalculation(item)
+    }
+}
+
+// ✅ Setup cooperativo
+@MainActor
+class ViewModel {
+    func setupUI() async {
+        for view in 1000 {
+            setupView(view)
+            await Task.yield() // ✅ UI não congela!
+        }
+    }
+}
+```
+
+**Quando usar:**
+
+| Situação | Use |
+|----------|-----|
+| Aguardar X segundos | `Task.sleep` |
+| Dar chance a outras tasks | `Task.yield` |
+| Debouncing | `Task.sleep` |
+| Loop com muitos items | `Task.yield` |
+| Retry com delay | `Task.sleep` |
+
+---
+
+### Padrão UIKit → Swift Concurrency: Step by Step
+
+**Exemplo Real: Conversão de UIViewController com URLSession**
+
+**ANTES (Callbacks):**
+
+```swift
+class FilmDetailViewController: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        loadData()
+    }
+    
+    private func loadData() {
+        let filmId = "123"
+        
+        // Fetch film
+        URLSession.shared.dataTask(with: filmsURL) { [weak self] data, _, error in
+            guard let self = self, let data = data else { return }
+            
+            let films: [Film] = try! JSONDecoder().decode([Film].self, from: data)
+            let film = films.first { $0.id == filmId }
+            
+            // Fetch people
+            URLSession.shared.dataTask(with: peopleURL) { [weak self] data, _, error in
+                guard let self = self, let data = data else { return }
+                
+                let people: [Person] = try! JSONDecoder().decode([Person].self, from: data)
+                
+                DispatchQueue.main.async {
+                    self.updateUI(film: film, people: people)
+                }
+            }.resume()
+        }.resume()
+    }
+}
+```
+
+**DEPOIS (async/await):**
+
+```swift
+@MainActor
+final class FilmDetailViewController: UIViewController {
+    private let viewModel: FilmDetailViewModel
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        Task {
+            await loadData()
+        }
+    }
+    
+    private func loadData() async {
+        do {
+            let film = try await viewModel.fetchFilm(id: "123")
+            let people = try await viewModel.fetchPeople(for: film)
+            
+            updateUI(film: film, people: people)
+        } catch {
+            showError(error)
+        }
+    }
+}
+
+@MainActor
+final class FilmDetailViewModel {
+    private let repository: FilmRepository
+    
+    func fetchFilm(id: String) async throws -> Film {
+        try await repository.fetchFilm(id: id)
+    }
+    
+    func fetchPeople(for film: Film) async throws -> [Person] {
+        try await repository.fetchPeople(for: film)
+    }
+}
+
+actor FilmRepository {
+    func fetchFilm(id: String) async throws -> Film {
+        let (data, _) = try await URLSession.shared.data(from: filmsURL)
+        let films = try JSONDecoder().decode([Film].self, from: data)
+        return films.first { $0.id == id } ?? .stub
+    }
+    
+    func fetchPeople(for film: Film) async throws -> [Person] {
+        let (data, _) = try await URLSession.shared.data(from: peopleURL)
+        return try JSONDecoder().decode([Person].self, from: data)
+    }
+}
+```
+
+**Melhorias:**
+- ✅ 70% menos código
+- ✅ Sem `[weak self]` desnecessário
+- ✅ Sem `try!` force unwrap
+- ✅ Automático main thread dispatch
+- ✅ Tasks cancelam ao sair da view
+- ✅ Código mais testável
 
 ---
 
