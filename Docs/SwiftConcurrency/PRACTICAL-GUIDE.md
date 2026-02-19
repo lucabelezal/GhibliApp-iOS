@@ -8,7 +8,17 @@
 
 ---
 
-## 📚 Índice
+## � Fundamentos Científicos
+
+💡 **Quer aprofundar em conceitos fundamentais?** Este guia assume familiaridade com threads, concorrência e paralelismo. Para uma base científica sólida antes de começar, consulte [Fundamentos Científicos de Concorrência](References/FUNDAMENTALS.md) — cobrindo:
+- Diferença entre **threads e tasks**
+- **Concorrência vs Paralelismo** (não são a mesma coisa!)
+- **Problemas clássicos**: race conditions, deadlocks, mutex
+- **Modelos de concorrência** e por que Swift escolheu o actor model
+
+---
+
+## �📚 Índice
 
 1. [Introdução - Por que Swift Concurrency?](#introdução---por-que-swift-concurrency)
 2. [async/await - O Básico](#asyncawait---o-básico)

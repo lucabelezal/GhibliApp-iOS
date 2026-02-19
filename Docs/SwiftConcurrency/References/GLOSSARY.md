@@ -3,6 +3,9 @@
 
 Definições concisas dos principais termos de Swift Concurrency usados neste material.
 
+> 💡 **Fundamentos científicos**: Para uma compreensão profunda dos conceitos de threads, concorrência, paralelismo e sincronização que fundamentam Swift Concurrency, consulte [FUNDAMENTALS.md](FUNDAMENTALS.md).
+
+---
 
 ## Isolamento de actor
 

@@ -3,6 +3,7 @@
 
 Padrões centrais para criar, gerenciar e controlar trabalho concorrente em Swift.
 
+> 💡 **Fundamentos**: Para entender tasks como abstração sobre threads e evolução histórica (pthreads → NSOperation → GCD → Swift Concurrency), consulte [Fundamentos Científicos - Seção 8: Tasks como Abstração](FUNDAMENTALS.md#8-tasks-como-abstração).
 
 ## O que é uma Task?
 

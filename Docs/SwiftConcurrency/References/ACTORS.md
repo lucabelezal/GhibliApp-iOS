@@ -2,6 +2,8 @@
 
 Padrões de isolamento de dados e gerenciamento de estado thread-safe em Swift.
 
+> 💡 **Fundamentos científicos**: Para entender por que Swift escolheu o actor model sobre shared memory multithreading, e comparação com outros modelos de concorrência, consulte [Fundamentos Científicos - Seção 9: Modelos de Concorrência](FUNDAMENTALS.md#9-modelos-de-concorrência).
+
 ## O que é um Ator?
 
 Atores protegem o estado mutável garantindo que apenas uma tarefa o acesse por vez. São tipos de referência com sincronização automática.

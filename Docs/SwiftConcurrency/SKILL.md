@@ -48,6 +48,11 @@ Se algo for desconhecido, peça confirmação ao desenvolvedor antes de dar cons
 
 Quando um dev pedir orientação de concorrência, siga esta árvore:
 
+0. **Não entendo conceitos fundamentais (threads, concorrência vs paralelismo)?**
+   - Leia `references/fundamentals.md` para uma base científica sólida
+   - Cobre: threads vs tasks, concorrência vs paralelismo, problemas clássicos, mutex, modelos de sincronização
+   - Retorne aqui após entender os fundamentos
+
 1. **Vai começar código async do zero?**
    - Leia `references/async-await-basics.md` para padrões básicos
    - Para operações paralelas → `references/tasks.md` (async let, task groups)
@@ -73,6 +78,9 @@ Quando um dev pedir orientação de concorrência, siga esta árvore:
 
 7. **Problemas de memória com tasks?**
    - Leia `references/memory-management.md` para evitar retain cycles
+
+8. **Conceitos fundamentais?**
+   - Leia `references/fundamentals.md` para threads, concorrência, paralelismo, sincronização
 
 ## Playbook de Triagem (Erros Comuns → Melhor Próxima Ação)
 

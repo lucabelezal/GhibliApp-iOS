@@ -3,6 +3,7 @@
 
 Entendendo como o Swift Concurrency gerencia threads e contextos de execução.
 
+> 💡 **Versão científica**: Para uma compreensão profunda de threads no nível do sistema operacional, scheduling, context switching e interleaving, consulte [Fundamentos Científicos de Concorrência - Seção 2: Threads no SO](FUNDAMENTALS.md#2-threads-no-sistema-operacional).
 
 ## Conceitos Centrais
 
