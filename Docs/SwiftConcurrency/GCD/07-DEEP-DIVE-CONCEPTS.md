@@ -8,6 +8,8 @@
 
 Este capítulo aprofunda em **casos técnicos reais de GCD** onde decisões arquiteturais impactam corretude e performance.
 
+Você verá patterns, anti-patterns e soluções que emergem ao integrar GCD em sistemas complexos.
+
 ---
 
 ## 📌 Queue Hierarchy e Implicit Deadlocks
@@ -341,13 +343,13 @@ Task(priority: .userInitiated) {
 
 ---
 
-## 📌 Questões Profundas (Sem Chamar de Entrevista)
+## 📌 Análise Arquitetural
 
-### 1. Design: Quando Você Usaria Uma Custom Serial Queue?
+### 1. Custom Serial Queue: When and Why
 
-**RespoCustom Serial Queue: When and Why
-
-**Aplicações reais operações
+**Aplicações reais:**
+- Isolamento de estado mutável
+- Garantir ordem de operações
 - Evitar threading overhead de múltiplas operações
 
 Exemplo: Database proxy
@@ -369,9 +371,9 @@ final class DatabaseProxy {
 ### 2. Debugging Thread Explosion
 
 **Estratégia:**
-- Instruments → System Trace → Thread States
-- Procurar por > 50 threads em app idle
-- Identificar queue que está criando demanda
+- Usar Instruments → System Trace → Thread States
+- Diagnosticar quando thread count > 50 em idle
+- Identificar qual queue está gerando demanda não controlada
 
 ```swift
 // Detectar
@@ -409,24 +411,24 @@ String(y)  // Lê simultaneamente sem lock
 
 **Componentes de um design sólido:**
 
-1. **Entende trade-offs**
+1. **Trade-off Awareness**
    - serial queue vs lock: Simplicidade vs granularidade
    - async vs sync: Responsiveness vs simplicity
-   - DispatchGroup vs Task: GCD vs Modern
+   - DispatchGroup vs Task: Diferentes paradigmas
 
-2. **Raciocina sobre performance**
+2. **Performance Reasoning**
    - False sharing, thread pooling, context switching
-   - Como QoS mapeia para real scheduling
+   - Mapping QoS a real CPU scheduling
 
-3. **Previne bugs**
-   - Identifica deadlocks potenciais
-   - Entende memory ordering
-   - Sabe quando é unsafe o design
+3. **Bug Prevention**
+   - Identificando deadlocks estruturais
+   - Garantindo memory ordering correto
+   - Reconhecendo designs não-seguros cedo
 
-4. **Conecta abstrações**
-   - GCD é base
-   - Swift Concurrency é abstração
-   - Ambas coexistem e se complementam
+4. **Abstraction Composition**
+   - GCD como fundação
+   - Swift Concurrency como camada superior
+   - Coexistência e integração prática
 
 ---
 

@@ -405,4 +405,4 @@ DispatchQueue.concurrentPerform(iterations: 100) { i in
 
 ## 🔗 Próximo Passo
 
-→ [07 - Deep Dive para Entrevistas](./07-INTERVIEW-DEEP-DIVE.md)
+→ [07 - Deep Dive: Concepts Avançados](./07-DEEP-DIVE-CONCEPTS.md)

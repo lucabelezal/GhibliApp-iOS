@@ -34,8 +34,9 @@ Você aprenderá:
 5. [04 - Memory Semantics & Thread Safety](./04-MEMORY-SEMANTICS.md)
 6. [06 - Padrões Avançados](./06-ADVANCED-PATTERNS.md)
 
-### Para Entrevistas Técnicas (30 min)
-7. [07 - Deep Dive para Entrevistas](./07-INTERVIEW-DEEP-DIVE.md)
+### Para Arquitetura Avançada (50 min)
+7. [07 - Deep Dive: Concepts Avançados](./07-DEEP-DIVE-CONCEPTS.md)
+8. [08 - Mixing GCD e Swift Concurrency](./08-MIXING-GCD-AND-SWIFTCONCURRENCY.md)
 
 ---
 
