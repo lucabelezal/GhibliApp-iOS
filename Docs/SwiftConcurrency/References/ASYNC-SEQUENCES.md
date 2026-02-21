@@ -292,6 +292,37 @@ task.cancel() // Dispara onTermination com .cancelled
 
 **Sem método cancel explícito** – dependa do cancelamento da task.
 
+## Armadilha: loops sequenciais que nunca terminam
+
+Se um `for await` consome uma stream que **nunca finaliza**, o proximo loop nunca sera alcançado.
+
+```swift
+// ❌ Apenas a primeira stream e consumida
+func consumirDuasStreams() async {
+    for await valor in streamA {
+        print("A: \(valor)")
+    }
+
+    for await valor in streamB {
+        print("B: \(valor)")
+    }
+}
+```
+
+**Solucoes comuns:**
+
+- **AsyncAlgorithms:** combinar streams e consumir em um unico loop
+- **TaskGroup:** criar tarefas separadas para cada stream
+
+```swift
+import AsyncAlgorithms
+
+// Exemplo com combinacao (AsyncAlgorithms)
+for await valor in streamA.merge(with: streamB) {
+    print(valor)
+}
+```
+
 
 ## Políticas de Buffer
 
@@ -606,6 +637,29 @@ func timer(intervalo: Duration) -> AsyncStream<Date> {
 for await data in timer(intervalo: .seconds(1)) {
     print("Tick: \(data)")
 }
+```
+
+## Async Algorithms (pacote)
+
+O pacote **AsyncAlgorithms** adiciona operadores de alto nivel para `AsyncSequence`.
+
+**Quando usar:**
+- Debounce/throttle de eventos
+- Combinar streams (zip, merge, combineLatest)
+- Remover duplicados e filtrar ruido
+
+```swift
+import AsyncAlgorithms
+
+let streamA: AsyncStream<Int> = // ...
+let streamB: AsyncStream<Int> = // ...
+
+for await value in streamA
+    .combineLatest(with: streamB)
+    .removeDuplicates()
+    .debounce(for: .seconds(1)) {
+        print(value)
+    }
 ```
 
 

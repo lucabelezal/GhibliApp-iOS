@@ -177,6 +177,13 @@ UI → ViewModel → UseCase → Repository
 
 Sinta-se a vontade para abrir issues ou PRs com melhorias, especialmente em torno da estrategia de sincronizacao e cobertura de testes.
 
+## Documentacao tecnica
+
+- [Swift Concurrency](Docs/SwiftConcurrency/PRACTICAL-GUIDE.md)
+- [GCD Masterclass](Docs/SwiftConcurrency/GCD/README.md)
+- [Memory Management (ARC)](Docs/MemoryManagement/README.md)
+- [Linking (Static, Dynamic, Mergeable)](Docs/Linking/README.md)
+
 ## Documentação e capturas
 
 Há uma pasta de apoio com recursos visuais em `Docs/Screenshots/` contendo prints do app que ajudam no onboarding e revisão de UI. Arquivos atuais:
