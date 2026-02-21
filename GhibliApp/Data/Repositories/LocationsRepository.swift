@@ -1,6 +1,6 @@
 import Foundation
 
-struct LocationsRepository: LocationsRepositoryProtocol {
+actor LocationsRepository: LocationsRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
 

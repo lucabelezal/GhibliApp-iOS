@@ -1,6 +1,6 @@
 import Foundation
 
-struct SpeciesRepository: SpeciesRepositoryProtocol {
+actor SpeciesRepository: SpeciesRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
 

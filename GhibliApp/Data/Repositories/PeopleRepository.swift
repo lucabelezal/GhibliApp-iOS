@@ -1,6 +1,6 @@
 import Foundation
 
-struct PeopleRepository: PeopleRepositoryProtocol {
+actor PeopleRepository: PeopleRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
 	private let baseURL: URL

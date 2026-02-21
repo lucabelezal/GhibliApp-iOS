@@ -1,6 +1,6 @@
 import Foundation
 
-struct VehiclesRepository: VehiclesRepositoryProtocol {
+actor VehiclesRepository: VehiclesRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
 

@@ -1,6 +1,6 @@
 import Foundation
 
-struct FilmRepository: FilmRepositoryProtocol {
+actor FilmRepository: FilmRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
 	private let cacheKey = "films.catalog"

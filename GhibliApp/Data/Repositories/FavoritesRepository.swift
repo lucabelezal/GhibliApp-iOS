@@ -1,6 +1,6 @@
 import Foundation
 
-struct FavoritesRepository: FavoritesRepositoryProtocol {
+actor FavoritesRepository: FavoritesRepositoryProtocol {
 	private let storage: StorageAdapter
 	private let pendingStore: PendingChangeStore
 	private let storageKey = "favorites"
