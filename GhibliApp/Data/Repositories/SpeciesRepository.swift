@@ -10,7 +10,7 @@ actor SpeciesRepository: SpeciesRepositoryProtocol {
 	}
 
 	func fetchSpecies(for film: Film, forceRefresh: Bool) async throws -> [Species] {
-		let cacheKey = "species.\(film.id)"
+		let cacheKey = CacheKeys.species(filmId: film.id)
 		if !forceRefresh,
 		   let cached: [SpeciesDTO] = try await cache.load([SpeciesDTO].self, for: cacheKey) {
 			return cached.map(SpeciesMapper.map)

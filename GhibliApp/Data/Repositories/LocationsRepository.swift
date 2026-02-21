@@ -10,7 +10,7 @@ actor LocationsRepository: LocationsRepositoryProtocol {
 	}
 
 	func fetchLocations(for film: Film, forceRefresh: Bool) async throws -> [Location] {
-		let cacheKey = "locations.\(film.id)"
+		let cacheKey = CacheKeys.locations(filmId: film.id)
 		if !forceRefresh,
 		   let cached: [LocationDTO] = try await cache.load([LocationDTO].self, for: cacheKey) {
 			return cached.map(LocationMapper.map)

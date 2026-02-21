@@ -16,7 +16,7 @@ actor PeopleRepository: PeopleRepositoryProtocol {
 	}
 
 	func fetchPeople(for film: Film, forceRefresh: Bool) async throws -> [Person] {
-		let key = "people." + film.id
+		let key = CacheKeys.people(filmId: film.id)
 		if !forceRefresh, let cached: [PersonDTO] = try await cache.load([PersonDTO].self, for: key) {
 			return cached.map(PersonMapper.map)
 		}

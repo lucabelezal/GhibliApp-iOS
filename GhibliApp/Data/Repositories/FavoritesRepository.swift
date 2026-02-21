@@ -3,7 +3,6 @@ import Foundation
 actor FavoritesRepository: FavoritesRepositoryProtocol {
 	private let storage: StorageAdapter
 	private let pendingStore: PendingChangeStore
-	private let storageKey = "favorites"
 
 	init(storage: StorageAdapter, pendingStore: PendingChangeStore) {
 		self.storage = storage
@@ -11,7 +10,7 @@ actor FavoritesRepository: FavoritesRepositoryProtocol {
 	}
 
 	func loadFavorites() async throws -> Set<String> {
-		if let ids: [String] = try await storage.load([String].self, for: storageKey) {
+		if let ids: [String] = try await storage.load([String].self, for: CacheKeys.favorites) {
 			return Set(ids)
 		}
 		return []
@@ -27,7 +26,7 @@ actor FavoritesRepository: FavoritesRepositoryProtocol {
 			ids.insert(id)
 			action = .add
 		}
-		try await storage.save(Array(ids), for: storageKey)
+		try await storage.save(Array(ids), for: CacheKeys.favorites)
 
 		let change = PendingChange(entityId: id, entityType: .favorite, action: action)
 		try await pendingStore.add(change)
@@ -41,6 +40,6 @@ actor FavoritesRepository: FavoritesRepositoryProtocol {
 	}
 
 	func clearFavorites() async throws {
-		try await storage.save([String](), for: storageKey)
+		try await storage.save([String](), for: CacheKeys.favorites)
 	}
 }

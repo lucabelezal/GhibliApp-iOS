@@ -10,7 +10,7 @@ actor VehiclesRepository: VehiclesRepositoryProtocol {
 	}
 
 	func fetchVehicles(for film: Film, forceRefresh: Bool) async throws -> [Vehicle] {
-		let cacheKey = "vehicles.\(film.id)"
+		let cacheKey = CacheKeys.vehicles(filmId: film.id)
 		if !forceRefresh,
 		   let cached: [VehicleDTO] = try await cache.load([VehicleDTO].self, for: cacheKey) {
 			return cached.map(VehicleMapper.map)
