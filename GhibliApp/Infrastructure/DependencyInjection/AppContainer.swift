@@ -62,7 +62,7 @@ final class AppContainer {
 
 		self.router = AppRouter()
 
-		syncStartTask = Task.detached(priority: .utility) { [syncManager] in
+		syncStartTask = Task(priority: .utility) { [syncManager] in
 			await syncManager.start()
 		}
 	}
