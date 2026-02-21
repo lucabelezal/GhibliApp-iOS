@@ -1,9 +1,9 @@
 import Foundation
 
-@MainActor
 final class AppContainer {
 	static let shared = AppContainer()
 
+	@MainActor
 	let router: AppRouter
 	private let fetchFilmsUseCase: FetchFilmsUseCase
 	private let fetchPeopleUseCase: FetchPeopleUseCase
@@ -139,6 +139,7 @@ final class AppContainer {
 		syncStartTask?.cancel()
 	}
 
+	@MainActor
 	func makeFilmsViewModel() -> FilmsViewModel {
 		FilmsViewModel(
 			fetchFilmsUseCase: fetchFilmsUseCase,
@@ -148,6 +149,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeFilmDetailViewModel(film: Film) -> FilmDetailViewModel {
 		FilmDetailViewModel(
 			film: film,
@@ -160,6 +162,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeFavoritesViewModel() -> FavoritesViewModel {
 		FavoritesViewModel(
 			fetchFilmsUseCase: fetchFilmsUseCase,
@@ -168,6 +171,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeSearchViewModel() -> SearchViewModel {
 		SearchViewModel(
 			fetchFilmsUseCase: fetchFilmsUseCase,
@@ -177,6 +181,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeSettingsViewModel() -> SettingsViewModel {
 		SettingsViewModel(
 			clearCacheUseCase: clearCacheUseCase,
