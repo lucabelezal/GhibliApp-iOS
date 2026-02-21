@@ -49,7 +49,9 @@ actor PeopleRepository: PeopleRepositoryProtocol {
 			let httpClient = client
 			try await withThrowingTaskGroup(of: PersonDTO?.self) { group in
 				for url in detailURLs {
+					try Task.checkCancellation()
 					group.addTask {
+						try Task.checkCancellation()
 						do {
 							return try await httpClient.request(with: GhibliEndpoint.absolute(url))
 						} catch {
