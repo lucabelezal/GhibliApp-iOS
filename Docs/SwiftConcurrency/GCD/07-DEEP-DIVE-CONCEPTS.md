@@ -299,6 +299,373 @@ let workItem = DispatchWorkItem { [weak workItem] in
 
 ---
 
+## 📌 Memory Management: weak self, unowned e Retain Cycles
+
+Um dos bugs mais comuns com GCD envolve **captura de referências** em closures.
+
+### O Problema: Retain Cycle Clássico
+
+```swift
+class ViewController: UIViewController {
+    var data: String = "Initial"
+    
+    func loadData() {
+        DispatchQueue.global().async {
+            // ❌ PROBLEMA: Captura strong reference
+            sleep(5)  // Simula trabalho longo
+            print(self.data)  // self capturado fortemente
+        }
+    }
+    
+    deinit {
+        print("ViewController deallocated")  // Nunca roda!
+    }
+}
+
+// Uso:
+let vc = ViewController()
+vc.loadData()
+vc.dismiss()  // Pensa que VC foi deallocado
+
+// Problema: Closure mantém VC vivo por 5 segundos!
+```
+
+**Por quê é problema?**
+- ViewController **não é deallocado** até closure terminar
+- Memória retida desnecessariamente
+- Em loops infinitos, **leak permanente**
+
+### Solução 1: weak self (Recomendado)
+
+```swift
+class ViewController: UIViewController {
+    var data: String = "Initial"
+    
+    func loadData() {
+        DispatchQueue.global().async { [weak self] in
+            sleep(5)
+            guard let self = self else {
+                print("VC foi deallocado")
+                return  // Closure termina gracefully
+            }
+            print(self.data)  // Seguro
+        }
+    }
+    
+    deinit {
+        print("ViewController deallocated")  // Agora roda!
+    }
+}
+```
+
+**Quando usar `weak self`:**
+- ✅ Callbacks assíncronos
+- ✅ Timers e animações
+- ✅ Network requests
+- ✅ Qualquer closure que pode outlive o objeto
+
+### Solução 2: unowned self (Perigoso!)
+
+```swift
+class ViewController: UIViewController {
+    var data: String = "Initial"
+    
+    func loadData() {
+        DispatchQueue.global().async { [unowned self] in
+            sleep(5)
+            print(self.data)  // ⚠️ CRASH se VC foi deallocado!
+        }
+    }
+}
+
+// Se VC for deallocado antes do closure terminar → CRASH
+```
+
+**Quando usar `unowned self`:**
+- ⚠️ Apenas quando você **garante** que self nunca será deallocado antes da closure terminar
+- Exemplo: Closure curta dentro de método síncrono
+- **Em dúvida? Use `weak self`!**
+
+### Problema Sutil: Captura Implícita
+
+```swift
+class DataManager {
+    var items: [String] = []
+    
+    func processItems() {
+        DispatchQueue.global().async {
+            // ❌ Captura implícita de self!
+            for item in items {  // items é self.items
+                print(item)
+            }
+        }
+    }
+}
+```
+
+**Fix:**
+
+```swift
+class DataManager {
+    var items: [String] = []
+    
+    func processItems() {
+        DispatchQueue.global().async { [weak self] in
+            guard let self = self else { return }
+            
+            for item in self.items {  // Explícito
+                print(item)
+            }
+        }
+    }
+}
+```
+
+### Problema Real: DispatchQueue.main.async em deinit
+
+```swift
+class ImageLoader {
+    var image: UIImage?
+    
+    func loadImage() {
+        DispatchQueue.global().async { [weak self] in
+            let img = expensiveLoad()
+            
+            DispatchQueue.main.async {
+                // ❌ PERIGO: self já pode estar deallocado!
+                self?.image = img  // Crash se self é nil
+            }
+        }
+    }
+    
+    deinit {
+        print("ImageLoader deallocated")
+    }
+}
+```
+
+**Fix:**
+
+```swift
+class ImageLoader {
+    var image: UIImage?
+    
+    func loadImage() {
+        DispatchQueue.global().async { [weak self] in
+            let img = expensiveLoad()
+            
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.image = img  // Seguro
+            }
+        }
+    }
+}
+```
+
+### Padrão Nested Closures
+
+```swift
+class NetworkManager {
+    func fetchData(completion: @escaping (Data?) -> Void) {
+        DispatchQueue.global().async { [weak self] in
+            guard let self = self else {
+                completion(nil)
+                return
+            }
+            
+            let data = self.performRequest()
+            
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else {
+                    completion(nil)
+                    return
+                }
+                
+                self.processData(data)
+                completion(data)
+            }
+        }
+    }
+}
+```
+
+**Atenção:** Cada closure aninhada precisa de `[weak self]`!
+
+### Strong-Weak Dance Pattern
+
+```swift
+class ViewController: UIViewController {
+    func loadData() {
+        DispatchQueue.global().async { [weak self] in
+            guard let self = self else { return }
+            
+            // Agora self é strong dentro do escopo
+            // NÃO precisa de self? em cada linha
+            
+            let data1 = self.fetchData()
+            let data2 = self.processData(data1)
+            let data3 = self.transformData(data2)
+            
+            DispatchQueue.main.async { [weak self] in
+                self?.updateUI(data3)
+            }
+        }
+    }
+}
+```
+
+### Tabela de Decisão
+
+| Situação | Use | Motivo |
+|----------|-----|--------|
+| Closure assíncrona em objeto que pode ser deallocado | `[weak self]` | Evita retain cycle |
+| Closure curta que **certamente** termina antes de deinit | `[unowned self]` | Performance (evita optional) |
+| Closure que DEVE rodar mesmo se objeto foi deallocado | Strong capture | Closure independente do lifecycle |
+| Nested closures | `[weak self]` em cada | Cada closure captura independente |
+| Timers/animações | `[weak self]` | Sempre podem outlive o objeto |
+
+### Problema Avançado: Closure Escaping vs Non-Escaping
+
+```swift
+class DataProcessor {
+    // Non-escaping: roda imediatamente, não precisa weak
+    func processSync(_ block: () -> Void) {
+        block()  // Roda agora, self seguro
+    }
+    
+    // Escaping: pode rodar depois, precisa weak
+    func processAsync(_ block: @escaping () -> Void) {
+        DispatchQueue.global().async {
+            block()  // Pode rodar depois de deinit
+        }
+    }
+    
+    func usage() {
+        // Non-escaping: seguro sem weak
+        processSync {
+            print(self.data)  // OK
+        }
+        
+        // Escaping: precisa weak
+        processAsync { [weak self] in
+            print(self?.data ?? "nil")  // Necessário
+        }
+    }
+}
+```
+
+### Debugging Memory Leaks
+
+**Ferramentas:**
+
+1. **Instruments → Leaks**
+   - Detecta retain cycles
+   - Mostra call stack de onde leak aconteceu
+
+2. **Memory Graph Debugger** (Xcode)
+   - Pause app
+   - Debug Navigator → Memory Graph
+   - Procura por `!` (leak indicator)
+
+3. **Print no deinit**
+```swift
+class MyClass {
+    deinit {
+        print("✅ MyClass deallocated")
+        // Se não imprimir = leak!
+    }
+}
+```
+
+### Exemplo Real: Timer com Retain Cycle
+
+```swift
+class CountdownView: UIView {
+    var timer: Timer?
+    var count = 10
+    
+    func start() {
+        // ❌ LEAK: Timer retém closure, closure retém self, self retém timer
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            self.count -= 1
+            print(self.count)
+        }
+    }
+    
+    deinit {
+        timer?.invalidate()
+        print("CountdownView deallocated")  // Nunca roda!
+    }
+}
+```
+
+**Fix:**
+
+```swift
+class CountdownView: UIView {
+    var timer: Timer?
+    var count = 10
+    
+    func start() {
+        // ✅ weak self evita retain cycle
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else {
+                return  // Timer continua, mas closure não faz nada
+            }
+            self.count -= 1
+            print(self.count)
+            
+            if self.count == 0 {
+                self.timer?.invalidate()
+            }
+        }
+    }
+    
+    deinit {
+        timer?.invalidate()
+        print("CountdownView deallocated")  // Agora roda!
+    }
+}
+```
+
+### Anti-Pattern: Captura de Array/Dictionary
+
+```swift
+class DataContainer {
+    var items: [String] = Array(repeating: "data", count: 1000)
+    
+    func process() {
+        // ❌ Captura TODA array (cópia estrutural)
+        DispatchQueue.global().async {
+            for item in self.items {
+                print(item)
+            }
+        }
+    }
+}
+```
+
+**Melhor:**
+
+```swift
+class DataContainer {
+    var items: [String] = Array(repeating: "data", count: 1000)
+    
+    func process() {
+        let itemsCopy = items  // Cópia explícita uma vez
+        
+        DispatchQueue.global().async {
+            for item in itemsCopy {
+                print(item)
+            }
+        }
+    }
+}
+```
+
+---
+
 ## 📌 Transição GCD → Swift Concurrency
 
 ### Raciocínio
@@ -440,10 +807,14 @@ Pontos críticos em análise de arquitetura concorrente:
 - [ ] Todos os orderings e barriers documentados?
 - [ ] Deadlock paths identificados?
 - [ ] Memory barriers e coherency considerados?
+- [ ] **Todas closures assíncronas usam `[weak self]` ou justificam strong capture?**
+- [ ] **Retain cycles em timers/observers eliminados?**
+- [ ] **deinit implementado e testado (imprime quando dealloca)?**
 - [ ] Estratégia de debug com Instruments definida?
 - [ ] Decisão justificada: custom queue vs actor vs Task?
 - [ ] False sharing mitigado onde relevante?
 - [ ] Priority inversion mapeada?
+- [ ] **Nested closures com múltiplos `[weak self]` verificadas?**
 
 ---
 
@@ -455,6 +826,8 @@ Dominar GCD exige compreender:
 - CPU architecture e cache semantics
 - OS scheduling e kernel interactions
 - Memory ordering e visibility rules
+- **Memory management e capture semantics (weak/unowned/strong)**
+- **Retain cycles em closures assíncronas**
 - Race conditions e deadlock patterns
 - Performance implications de cada design choice
 
@@ -462,7 +835,7 @@ Swift Concurrency (Task, Actor, await) são abstrações construídas sobre esse
 
 Um design robusto conhece ambas as camadas — GCD e abstrações superiores — e sabe quando usar cada uma.
 
-O verdadeiro domínio é entender não apenas *como* usar, mas *por que* cada choice funciona ou falha.
+O verdadeiro domínio é entender não apenas *como* usar, mas *por que* cada choice funciona ou falha, e *como evitar* bugs sutis de memory management que só aparecem em produção.
 
 ---
 
