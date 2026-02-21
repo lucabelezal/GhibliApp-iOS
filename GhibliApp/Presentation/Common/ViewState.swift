@@ -19,17 +19,22 @@ struct ViewError: Sendable, Equatable, Identifiable {
 	let title: String
 	let message: String
 	let style: Style
+	
+	/// Informação estruturada do erro original para debugging e logging
+	let underlyingError: String?
 
 	init(
 		id: String = UUID().uuidString,
 		title: String = "Algo deu errado",
 		message: String,
-		style: Style = .generic
+		style: Style = .generic,
+		underlyingError: String? = nil
 	) {
 		self.id = id
 		self.title = title
 		self.message = message
 		self.style = style
+		self.underlyingError = underlyingError
 	}
 
 	static func from(
@@ -45,7 +50,12 @@ struct ViewError: Sendable, Equatable, Identifiable {
 			let description = error.localizedDescription
 			resolvedMessage = description.isEmpty ? fallbackMessage : description
 		}
-		return ViewError(title: title, message: resolvedMessage, style: .generic)
+		return ViewError(
+			title: title,
+			message: resolvedMessage,
+			style: .generic,
+			underlyingError: String(reflecting: error)
+		)
 	}
 
 	static func offline(
