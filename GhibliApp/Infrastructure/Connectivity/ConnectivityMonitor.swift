@@ -16,6 +16,9 @@ final class ConnectivityMonitor: ConnectivityRepositoryProtocol {
 	///   1. Continuations são append-only (sem mutação após criação).
 	///   2. Actor garante acesso serial ao array de armazenamento.
 	///   3. Todos os yields/finishes acontecem no MainActor, prevenindo data races.
+	///
+	/// **TODO:** Verificar com Swift 6 complete concurrency checking se @unchecked ainda é necessário
+	/// ou se pode ser substituído por uma solução que não escape o compilador's data race checking.
 	private final class ContinuationBox: @unchecked Sendable {
 		let continuation: AsyncStream<Bool>.Continuation
 		init(_ continuation: AsyncStream<Bool>.Continuation) {
