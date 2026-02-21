@@ -80,7 +80,7 @@ struct FilmRowView: View {
 			.frame(width: 44, height: 44)
 			.contentShape(Rectangle())
 			.buttonStyle(.plain)
-			.highPriorityGesture(TapGesture().onEnded { _ in onToggleFavorite() })
+			.accessibilityLabel(isFavorite ? L10n.Accessibility.removeFavorite : L10n.Accessibility.addFavorite)
 			.padding(.trailing, 8)
 		}
 	}
