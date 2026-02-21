@@ -244,6 +244,112 @@ DispatchQueue.main.asyncAfter(deadline: deadline) {
 
 ---
 
+## 🧵 O Que é Thread Pool?
+
+**Thread Pool** é um conjunto gerenciado de threads reutilizáveis criado pelo sistema operacional.
+
+### Conceito Fundamental
+
+Ao invés de **criar uma nova thread** cada vez que uma tarefa precisa rodar:
+
+```swift
+// ❌ Sem thread pool (pthread manual)
+pthread_create(&thread, NULL, work1, NULL)  // cria thread 1
+pthread_create(&thread, NULL, work2, NULL)  // cria thread 2
+pthread_create(&thread, NULL, work3, NULL)  // cria thread 3
+// Custoso: criar/destruir threads é caro (syscall, stack allocation)
+```
+
+O sistema mantém um **pool de threads prontas** para reutilizar:
+
+```swift
+// ✅ Com thread pool (GCD)
+DispatchQueue.global().async { work1() }  // reutiliza thread A
+DispatchQueue.global().async { work2() }  // reutiliza thread B
+DispatchQueue.global().async { work3() }  // reutiliza thread A (já está disponível)
+// Eficiente: threads já existem, apenas pegamos uma disponível
+```
+
+### Como Funciona no GCD
+
+```
+        Application Code
+               ↓
+    DispatchQueue.global().async { work }
+               ↓
+          ┌─────────┐
+          │   GCD   │ (scheduler do sistema)
+          └────┬────┘
+               ↓
+    ╔═════════════════════╗
+    ║    THREAD POOL      ║
+    ╠═════════════════════╣
+    ║  Thread 1: [BUSY]   ║ ← executando work1
+    ║  Thread 2: [IDLE]   ║ ← disponível
+    ║  Thread 3: [BUSY]   ║ ← executando work2
+    ║  Thread 4: [IDLE]   ║ ← disponível
+    ║         ...         ║
+    ╚═════════════════════╝
+             ↓
+    Sistema aloca work para thread idle
+```
+
+### Decisões do Sistema
+
+O **número de threads no pool** é gerenciado dinamicamente:
+
+```swift
+// Sistema considera:
+// 1. Número de cores da CPU
+// 2. QoS da tarefa (userInteractive vs background)
+// 3. Carga atual do sistema
+// 4. Trabalho em execução vs bloqueado (I/O, sleep)
+
+// Exemplo: iPhone com 6 cores
+// - Global queue (QoS .userInitiated): ~6-8 threads ativas
+// - Global queue (QoS .background): ~2-4 threads ativas
+// Sistema ajusta para evitar overcommit (threads demais = slowdown)
+```
+
+### Por Que Isso Importa?
+
+**1. Thread Explosion (anti-pattern):**
+```swift
+// ❌ PERIGO: criar 1000 queues serial = saturar o pool
+for i in 0..<1000 {
+    let queue = DispatchQueue(label: "queue\(i)")
+    queue.async { longTask() }
+}
+// Sistema pode criar 1000 threads → context switching → lentidão
+```
+
+**2. Thread Pool Saturation:**
+```swift
+// ❌ Bloquear muitas threads com sync
+for i in 0..<64 {
+    DispatchQueue.global().async {
+        semaphore.wait()  // bloqueia thread
+        // thread fica esperando, não volta ao pool
+    }
+}
+// Pool esgota → novas tarefas esperam → starvation
+```
+
+**3. Uso Correto:**
+```swift
+// ✅ Poucos serial queues para isolamento
+let dbQueue = DispatchQueue(label: "com.app.db")
+let networkQueue = DispatchQueue(label: "com.app.net")
+let cacheQueue = DispatchQueue(label: "com.app.cache", attributes: .concurrent)
+
+// ✅ Global queues para fire-and-forget
+DispatchQueue.global(qos: .utility).async {
+    processData()  // thread volta ao pool quando terminar
+}
+```
+
+---
+
 ## 📊 Hierarquia de Queues
 
 ```
