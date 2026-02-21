@@ -1,12 +1,12 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class FilmDetailSectionViewModel<Item>: ObservableObject {
+@Observable
+final class FilmDetailSectionViewModel<Item> {
 	private let film: Film
 	private let loader: (_ film: Film, _ forceRefresh: Bool) async throws -> [Item]
 
-	@Published
 	private(set) var state: ViewState<[Item]> = .idle
 
 	init(
