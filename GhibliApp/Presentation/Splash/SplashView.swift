@@ -6,6 +6,9 @@ struct SplashView: View {
 
 	@State
 	private var isAnimating = false
+	
+	@State
+	private var splashTask: Task<Void, Never>?
 
 	var body: some View {
 		ZStack {
@@ -13,6 +16,20 @@ struct SplashView: View {
 			splashContent
 		}
 		.onAppear(perform: handleAppear)
+		.task {
+			splashTask = Task {
+				do {
+					try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+					guard !Task.isCancelled else { return }
+					onFinished()
+				} catch {
+					// Task was cancelled
+				}
+			}
+		}
+		.onDisappear {
+			splashTask?.cancel()
+		}
 	}
 }
 
@@ -45,9 +62,6 @@ extension SplashView {
 
 	private func handleAppear() {
 		isAnimating = true
-		DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-			onFinished()
-		}
 	}
 }
 
