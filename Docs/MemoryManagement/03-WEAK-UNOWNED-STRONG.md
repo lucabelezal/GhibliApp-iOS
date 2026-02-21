@@ -629,6 +629,12 @@ class Owner {
 
 **Uso:** Performance crítica onde você GARANTE lifetime. Raramente usado.
 
+**Interop Objective-C:**
+
+- Equivalente a `__unsafe_unretained` em Objective-C
+- Aparece em APIs legacy (ex.: partes do Core Data)
+- Use apenas quando o lifetime e garantido por design
+
 ### Case 3: @unknown default
 
 ```swift

@@ -383,6 +383,86 @@ func useCPointer() {
 
 ---
 
+## 📊 Benchmark: strong vs weak vs unowned
+
+O objetivo aqui nao e obter numeros absolutos, mas **comparar custos relativos** de cada tipo de referencia.
+
+```swift
+import Foundation
+
+final class Counter {
+    var count = 0
+}
+
+func measure(label: String, block: () -> Void) -> UInt64 {
+    let start = DispatchTime.now().uptimeNanoseconds
+    block()
+    let end = DispatchTime.now().uptimeNanoseconds
+    let elapsed = end - start
+    print("\(label): \(elapsed) ns")
+    return elapsed
+}
+
+func runBenchmark() {
+    var counters = ContiguousArray<Counter>()
+    counters.reserveCapacity(10_000)
+
+    for _ in 0..<10_000 {
+        counters.append(Counter())
+    }
+
+    _ = measure(label: "strong") {
+        var total = 0
+        for index in counters.indices {
+            let counter = counters[index]
+            for i in 0..<1_000 {
+                counter.count += i
+                total += counter.count
+            }
+        }
+        _ = total
+    }
+
+    _ = measure(label: "weak") {
+        var total = 0
+        for index in counters.indices {
+            weak var counter = counters[index]
+            for i in 0..<1_000 {
+                counter?.count += i
+                total += counter?.count ?? 0
+            }
+        }
+        _ = total
+    }
+
+    _ = measure(label: "unowned") {
+        var total = 0
+        for index in counters.indices {
+            unowned let counter = counters[index]
+            for i in 0..<1_000 {
+                counter.count += i
+                total += counter.count
+            }
+        }
+        _ = total
+    }
+}
+
+runBenchmark()
+```
+
+### O que esperar
+
+- **strong** tende a ser o mais rapido
+- **unowned** vem logo depois (checks de runtime)
+- **weak** e o mais lento (side table + nil-check)
+
+Se voce testar `unowned(unsafe)` ou `Unmanaged`, o custo costuma ficar proximo de strong, mas com **risco real de undefined behavior** se o lifetime nao for garantido.
+
+> Dica: rode em **Release**, com varias iteracoes, e execute mais de uma vez para amortizar ruidos do sistema.
+
+---
+
 ## 🐛 Debugging ARC Issues
 
 ### 1. Print no deinit

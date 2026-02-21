@@ -148,6 +148,14 @@ O **número de threads no pool** é gerenciado dinamicamente:
 // Sistema ajusta para evitar overcommit (threads demais = slowdown)
 ```
 
+#### O que acontece quando voce envia uma tarefa
+
+- **Task assignment:** GCD enfileira a tarefa e procura uma thread idle compatível com o QoS.
+- **Thread reuse:** se existir thread livre, ela e reutilizada (evita create/destroy caro).
+- **Backpressure natural:** se nao ha threads livres, a tarefa espera na fila.
+- **Energy efficiency:** tarefas de QoS baixo podem ir para cores de eficiencia, preservando bateria.
+- **Load balancing:** o sistema tenta distribuir trabalho para manter cores ocupados sem overcommit.
+
 ### 🎯 Diferença Crucial: DispatchQueue vs Thread
 
 ```
