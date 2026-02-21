@@ -16,25 +16,30 @@ final class CachedPayload {
 /// Adaptador de armazenamento baseado em SwiftData para cache offline.
 ///
 /// **Segurança de Concorrência:**
-/// - Isolado ao `@MainActor` porque o `ModelContext` do SwiftData requer acesso na thread principal.
-/// - Todas as operações são garantidas de executar no main actor.
-/// - Chamadores usam `await` para coordenar com o isolamento do MainActor.
-/// - Não precisa de `@unchecked Sendable` - o isolamento adequado do actor garante segurança de threads.
-@MainActor
-final class SwiftDataAdapter: StorageAdapter {
+/// - Implementa `ModelActor` para permitir operações de I/O em background
+/// - As operações de leitura/escrita não bloqueiam a main thread
+/// - Todas as operações são executadas no contexto do actor de forma serializada
+/// - Chamadores usam `await` para coordenar com o isolamento do actor
+actor SwiftDataAdapter: ModelActor, StorageAdapter {
 	static let shared = SwiftDataAdapter()
 
-	private let container: ModelContainer
+	nonisolated let modelExecutor: any ModelExecutor
+	nonisolated let modelContainer: ModelContainer
+	
 	private init() {
 		do {
-			container = try ModelContainer(for: CachedPayload.self)
+			let container = try ModelContainer(for: CachedPayload.self)
+			self.modelContainer = container
+			let context = ModelContext(container)
+			self.modelExecutor = DefaultSerialExecutor()
 		} catch {
 			fatalError("Failed to create SwiftData container: \(error)")
 		}
 	}
 
-	@MainActor
-	private var context: ModelContext { ModelContext(container) }
+	private var context: ModelContext { 
+		ModelContext(modelContainer)
+	}
 
 	func save<T: Codable & Sendable>(_ value: T, for key: String) async throws {
 		let payload = try JSONEncoder().encode(value)
