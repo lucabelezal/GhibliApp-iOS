@@ -13,9 +13,440 @@ Uma `DispatchQueue` é um objeto que:
 2. Executa em uma thread dentro do thread pool do sistema
 3. Garante ordem ou permite paralelismo conforme sua configuração
 
+Para entender como isso funciona, primeiro precisamos entender o que são threads e como o iOS as gerencia.
+
+---
+
+## 🏗️ Fundamentos: Threads, Processos e Thread Pool
+
+Antes de usar DispatchQueues, é essencial entender a arquitetura do iOS.
+
+### Hierarquia Completa
+
+```
+┌─────────────────────────────────────────────────────┐
+│             SISTEMA OPERACIONAL (iOS)               │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐ │
+│  │          PROCESSO: Seu App                    │ │
+│  │                                               │ │
+│  │  ┌─────────────────────────────────────────┐ │ │
+│  │  │         MAIN THREAD (UI Thread)         │ │ │
+│  │  │  - Roda RunLoop                         │ │ │
+│  │  │  - Processa eventos de toque            │ │ │
+│  │  │  - Atualiza views (UIKit/SwiftUI)       │ │ │
+│  │  │  - DispatchQueue.main executa aqui      │ │ │
+│  │  └─────────────────────────────────────────┘ │ │
+│  │                                               │ │
+│  │  ┌─────────────────────────────────────────┐ │ │
+│  │  │         THREAD POOL (GCD)               │ │ │
+│  │  │                                         │ │ │
+│  │  │  Thread 1 ────> DispatchQueue.global() │ │ │
+│  │  │  Thread 2 ────> Custom Serial Queue    │ │ │
+│  │  │  Thread 3 ────> Custom Concurrent Queue│ │ │
+│  │  │  Thread 4 ────> (idle)                 │ │ │
+│  │  │  Thread 5 ────> (idle)                 │ │ │
+│  │  │  ...                                    │ │ │
+│  │  └─────────────────────────────────────────┘ │ │
+│  │                                               │ │
+│  │  Memória Compartilhada:                       │ │
+│  │  - Heap (objetos, arrays, etc)               │ │
+│  │  - Todas threads acessam mesma memória        │ │
+│  │    (por isso precisamos sincronização!)       │ │
+│  └───────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+### 🧵 Threads vs Processos vs Tasks
+
+```swift
+// PROCESSO = Seu app inteiro
+// - Tem memória isolada do resto do sistema
+// - iOS cria um processo quando você abre o app
+
+// THREAD = Linha de execução dentro do processo
+// - Todas threads compartilham a MESMA memória
+// - iOS cria automaticamente:
+//   1. Main Thread (para UI)
+//   2. Thread Pool (para GCD)
+
+// DISPATCH QUEUE = Fila que distribui trabalho para threads
+DispatchQueue.main        // usa Main Thread
+DispatchQueue.global()    // usa qualquer thread do pool
+
+// TASK (Swift Concurrency) = Unidade de trabalho assíncrono
+Task {
+    // Gerenciado pelo executor do Swift Concurrency
+    // Mais abstrato que threads
+}
+```
+
+### 🧵 O Que é Thread Pool?
+
+**Thread Pool** é um conjunto gerenciado de threads reutilizáveis criado pelo sistema operacional.
+
+#### Conceito Fundamental
+
+Ao invés de **criar uma nova thread** cada vez que uma tarefa precisa rodar:
+
+```swift
+// ❌ Sem thread pool (pthread manual)
+pthread_create(&thread, NULL, work1, NULL)  // cria thread 1
+pthread_create(&thread, NULL, work2, NULL)  // cria thread 2
+pthread_create(&thread, NULL, work3, NULL)  // cria thread 3
+// Custoso: criar/destruir threads é caro (syscall, stack allocation)
+```
+
+O sistema mantém um **pool de threads prontas** para reutilizar:
+
+```swift
+// ✅ Com thread pool (GCD)
+DispatchQueue.global().async { work1() }  // reutiliza thread A
+DispatchQueue.global().async { work2() }  // reutiliza thread B
+DispatchQueue.global().async { work3() }  // reutiliza thread A (já está disponível)
+// Eficiente: threads já existem, apenas pegamos uma disponível
+```
+
+#### Como Funciona no GCD
+
+```
+        Application Code
+               ↓
+    DispatchQueue.global().async { work }
+               ↓
+          ┌─────────┐
+          │   GCD   │ (scheduler do sistema)
+          └────┬────┘
+               ↓
+    ╔═════════════════════╗
+    ║    THREAD POOL      ║
+    ╠═════════════════════╣
+    ║  Thread 1: [BUSY]   ║ ← executando work1
+    ║  Thread 2: [IDLE]   ║ ← disponível
+    ║  Thread 3: [BUSY]   ║ ← executando work2
+    ║  Thread 4: [IDLE]   ║ ← disponível
+    ║         ...         ║
+    ╚═════════════════════╝
+             ↓
+    Sistema aloca work para thread idle
+```
+
+#### Decisões do Sistema
+
+O **número de threads no pool** é gerenciado dinamicamente:
+
+```swift
+// Sistema considera:
+// 1. Número de cores da CPU
+// 2. QoS da tarefa (userInteractive vs background)
+// 3. Carga atual do sistema
+// 4. Trabalho em execução vs bloqueado (I/O, sleep)
+
+// Exemplo: iPhone com 6 cores
+// - Global queue (QoS .userInitiated): ~6-8 threads ativas
+// - Global queue (QoS .background): ~2-4 threads ativas
+// Sistema ajusta para evitar overcommit (threads demais = slowdown)
+```
+
+### 🎯 Diferença Crucial: DispatchQueue vs Thread
+
+```
+❌ ERRADO (modelo mental incorreto):
+DispatchQueue.global() = "cria nova thread"
+DispatchQueue.main = "cria thread da UI"
+
+✅ CERTO (modelo mental correto):
+DispatchQueue.global() = "enfileira trabalho para SER executado 
+                          em alguma thread disponível no pool"
+
+DispatchQueue.main = "enfileira trabalho para SER executado 
+                      na main thread (que já existe)"
+```
+
+**Analogia:**
+- **Thread** = Trabalhador (humano)
+- **DispatchQueue** = Fila de tarefas na mesa do trabalhador
+- **Work Item** = Tarefa específica (closure)
+
+```
+Main Thread (trabalhador 1):
+  📋 Fila: [renderizar view, processar touch, ...]
+  
+Thread Pool (trabalhadores 2-8):
+  📋 Fila Global: [download, processamento, ...]
+  📋 Fila Serial DB: [write, read, delete, ...]
+```
+
+### 🔬 Experimento: Rastreando Threads
+
+```swift
+func trackThread(label: String) {
+    let threadID = Thread.current
+    let isMain = Thread.isMainThread
+    print("\(label)")
+    print("  Thread: \(threadID)")
+    print("  É main? \(isMain)")
+    print("  Name: \(Thread.current.name ?? "unnamed")")
+    print("")
+}
+
+// Teste 1: Main
+trackThread(label: "1️⃣ Main directly")
+
+// Teste 2: DispatchQueue.main
+DispatchQueue.main.async {
+    trackThread(label: "2️⃣ DispatchQueue.main")
+}
+
+// Teste 3: Global
+DispatchQueue.global().async {
+    trackThread(label: "3️⃣ DispatchQueue.global()")
+}
+
+// Teste 4: Custom Serial
+let serial = DispatchQueue(label: "com.app.serial")
+serial.async {
+    trackThread(label: "4️⃣ Custom Serial")
+}
+
+// Teste 5: Custom Concurrent
+let concurrent = DispatchQueue(label: "com.app.concurrent", attributes: .concurrent)
+concurrent.async {
+    trackThread(label: "5️⃣ Custom Concurrent")
+}
+
+// Output:
+// 1️⃣ Main directly
+//   Thread: <_NSMainThread: 0x600...>{number = 1}
+//   É main? true
+//   Name: (main)
+//
+// 2️⃣ DispatchQueue.main
+//   Thread: <_NSMainThread: 0x600...>{number = 1}  ← MESMA thread que 1️⃣
+//   É main? true
+//   Name: (main)
+//
+// 3️⃣ DispatchQueue.global()
+//   Thread: <NSThread: 0x600...>{number = 3}
+//   É main? false
+//   Name: (unnamed)
+//
+// 4️⃣ Custom Serial
+//   Thread: <NSThread: 0x600...>{number = 5}
+//   É main? false
+//   Name: (unnamed)
+//
+// 5️⃣ Custom Concurrent
+//   Thread: <NSThread: 0x600...>{number = 7}
+//   É main? false
+//   Name: (unnamed)
+```
+
+### 📊 Resumo Visual: Fluxo Completo
+
+```
+   Seu Código
+       ↓
+DispatchQueue.global().async {
+    heavyWork()
+}
+       ↓
+  ┌─────────┐
+  │   GCD   │ (Scheduler do Sistema)
+  └────┬────┘
+       ↓
+  Escolhe thread do pool
+       ↓
+  ┌──────────────┐
+  │ Thread #3    │ ← executa heavyWork()
+  │ (do pool)    │
+  └──────────────┘
+       ↓
+  volta ao pool (idle)
+```
+
+---
+
+## ⏱️ async vs sync: Bloqueante vs Não-Bloqueante
+
+Agora que entendemos threads e thread pool, vamos ao conceito **mais importante**: async vs sync.
+
+```swift
+// ASYNC: returna imediatamente
+queue.async {
+    heavyWork()  // roda depois
+}
+print("continuei")  // imprime logo após async
+
+// SYNC: bloqueia até terminar
+queue.sync {
+    heavyWork()  // roda agora
+}
+print("continuei")  // imprime só depois de terminar
+```
+
+### Tabela Comparativa
+
+| Aspecto | async | sync |
+|---------|-------|------|
+| Retorno | Imediato | Bloqueia até terminar |
+| Caller | Continua | Espera |
+| Uso comum | Fire-and-forget | Obter resultado |
+| Segurança | Melhor (não bloqueia) | Perigosa (deadlock) |
+
+### 🧠 Entendendo: Onde Executa vs Quem Espera
+
+**O erro mais confuso:** "Se `DispatchQueue.global()` é outra thread, por que `.sync` congela a UI?"
+
+**Resposta:** `.sync` bloqueia a thread **CALLER** (quem chamou), não a thread onde o trabalho executa.
+
+```swift
+// Cenário: Você está na MAIN THREAD
+// viewDidLoad() = MAIN THREAD
+
+override func viewDidLoad() {
+    super.viewDidLoad()
+    print("🟢 Main thread: antes do sync")
+    
+    // ❌ PROBLEMA AQUI
+    DispatchQueue.global().sync {
+        // Trabalho executa em OUTRA thread (global)
+        // MAS main thread fica BLOQUEADA esperando
+        sleep(5)
+        print("💼 Global thread: trabalhando")
+    }
+    
+    print("🟢 Main thread: depois do sync")
+    // UI só atualiza DEPOIS de esperar 5 segundos
+}
+```
+
+### 📊 Diagrama Visual: .sync vs .async
+
+**Cenário 1: `.sync` - Main Thread BLOQUEIA**
+
+```
+MAIN THREAD                    GLOBAL THREAD
+     │                              │
+     │ viewDidLoad()                │
+     │                              │
+     ├──┐                          │
+     │  │ DispatchQueue.global()   │
+     │  │      .sync { ... }       │
+     │  └─────────────────────────>│
+     │                              │ fetchNetwork()
+     │  ⏸️ BLOQUEADA               │ sleep(5)
+     │  (UI CONGELADA)              │ (trabalhando...)
+     │                              │
+     │<─────────────────────────────┤ retorna
+     │                              │
+     │ updateUI()                   │
+     │ (SÓ AGORA!)                  │
+     ▼                              ▼
+
+Tempo total: 5 segundos de UI congelada
+```
+
+**Cenário 2: `.async` - Main Thread CONTINUA**
+
+```
+MAIN THREAD                    GLOBAL THREAD
+     │                              │
+     │ viewDidLoad()                │
+     │                              │
+     ├──┐                          │
+     │  │ DispatchQueue.global()   │
+     │  │      .async { ... }      │
+     │  └─────────────────────────>│
+     │                              │ fetchNetwork()
+     │ ✅ CONTINUA                 │ sleep(5)
+     │ updateUI() imediatamente     │ (trabalhando...)
+     │ (UI RESPONSIVA)              │
+     │                              │
+     │                              │ terminou()
+     │<─────────────────────────────┤ callback
+     │ updateUI com resultado       │
+     ▼                              ▼
+
+Tempo: Main thread nunca bloqueia
+```
+
+### Exemplo Real: Carregamento de Dados
+
+```swift
+class ViewController: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // ❌ ERRADO: .sync BLOQUEIA main thread
+        print("🟢 Main: antes (.sync)")
+        DispatchQueue.global().sync {
+            print("💼 Global: começou fetch")
+            sleep(5)  // simula rede lenta
+            print("💼 Global: terminou fetch")
+        }
+        print("🟢 Main: depois (.sync)")
+        label.text = "Carregado"  // SÓ ATUALIZA DEPOIS DE 5s
+        
+        // Output:
+        // 🟢 Main: antes (.sync)
+        // 💼 Global: começou fetch
+        // [5 segundos de UI CONGELADA] ⏸️
+        // 💼 Global: terminou fetch
+        // 🟢 Main: depois (.sync)
+        // UI atualiza
+        
+        
+        // ✅ CERTO: .async NÃO BLOQUEIA
+        print("🟢 Main: antes (.async)")
+        DispatchQueue.global().async {
+            print("💼 Global: começou fetch")
+            sleep(5)  // simula rede lenta
+            print("💼 Global: terminou fetch")
+            
+            DispatchQueue.main.async {
+                print("🟢 Main: atualizando UI")
+                self.label.text = "Carregado"
+            }
+        }
+        print("🟢 Main: depois (.async) - UI RESPONSIVA!")
+        
+        // Output:
+        // 🟢 Main: antes (.async)
+        // 🟢 Main: depois (.async) - UI RESPONSIVA!
+        // 💼 Global: começou fetch
+        // [UI continua funcionando] ✅
+        // 💼 Global: terminou fetch
+        // 🟢 Main: atualizando UI
+    }
+}
+```
+
+### 🎯 Regra de Ouro
+
+| Situação | Thread Caller | Queue Destino | Use | Resultado |
+|----------|--------------|---------------|-----|-----------|
+| Main → trabalho pesado | Main Thread | `.global()` | `.async` | UI não trava |
+| Main → trabalho pesado | Main Thread | `.global()` | `.sync` | ❌ UI CONGELA |
+| Background → atualizar UI | Background | `.main` | `.async` | ✅ Seguro |
+| Background → atualizar UI | Background | `.main` | `.sync` | ⚠️ Possível deadlock |
+
+### ⚠️ O Erro Mais Comum: Sync na Main Thread
+
+```swift
+// ❌ DEADLOCK GARANTIDO
+DispatchQueue.main.sync {
+    print("Isto nunca roda")
+}
+// Main thread tenta pedir à main queue
+// mas está bloqueado esperando por si mesmo
+```
+
 ---
 
 ## 📌 Tipos de Queues
+
+Agora que você entende threads, thread pool e async/sync, vamos ver os tipos de queues disponíveis.
 
 ### 1. Main Queue
 
@@ -35,6 +466,8 @@ DispatchQueue.main.async {
 }
 ```
 
+---
+
 ### 2. Global Queues
 
 ```swift
@@ -47,6 +480,31 @@ DispatchQueue.global(qos: .userInitiated)
 - Gerenciadas pelo sistema
 - Diferentes níveis de prioridade (QoS)
 
+#### 🎚️ Níveis de Prioridade (QoS)
+
+QoS = **Quality of Service** (qualidade de serviço). Indica ao sistema quão importante é o trabalho:
+
+```swift
+// Alta prioridade (UI, animações)
+DispatchQueue.global(qos: .userInteractive).async { }
+
+// Alta (usuário espera resposta)
+DispatchQueue.global(qos: .userInitiated).async { }
+
+// Média (pode demorar, mostra progresso)
+DispatchQueue.global(qos: .utility).async { }
+
+// Baixa (background, usuário nem sabe que roda)
+DispatchQueue.global(qos: .background).async { }
+```
+
+**Como funciona:**
+- `.userInteractive` → roda em cores rápidos (P-cores), alta prioridade
+- `.background` → roda em cores eficientes (E-cores), baixa prioridade
+- Sistema ajusta CPU, prioridade e timing baseado no QoS
+
+> 💡 **Detalhes completos** sobre QoS na seção [🎯 QoS (Quality of Service)](#-qos-quality-of-service) abaixo.
+
 **Quando usar:**
 ```swift
 DispatchQueue.global(qos: .userInitiated).async {
@@ -56,6 +514,8 @@ DispatchQueue.global(qos: .userInitiated).async {
     }
 }
 ```
+
+---
 
 ### 3. Custom Serial Queues
 
@@ -86,7 +546,8 @@ queue.async {
 - `DispatchQueue.global()` = **compartilhada** por todo o app → sem garantias de ordem
 - Custom serial queue = **exclusiva** para seu objeto → execução sequencial garantida
 
-**Exemplo prático com print:**
+#### Exemplo Prático com print:
+
 ```swift
 var counter = 0
 let serialQueue = DispatchQueue(label: "com.example.serial")
@@ -123,7 +584,8 @@ for i in 1...5 {
 // Global: 5
 ```
 
-**Quando usar:**
+#### Uso Prático: Database com Isolamento
+
 ```swift
 final class Database {
     // Custom queue garante que writes/reads nunca acontecem simultaneamente
@@ -160,8 +622,6 @@ let name = db.read("name")  // espera até pegar valor (sync)
 // ✍️ Write name = John
 // 📖 Read name = Optional("John")
 ```
-
----
 
 #### 🎯 Por Que Write Usa `.async` e Read Usa `.sync`?
 
@@ -343,7 +803,8 @@ Tempo →
 [Read4] [Read5]          ← Reads em paralelo novamente
 ```
 
-**Exemplo prático com print:**
+#### Exemplo Prático com print:
+
 ```swift
 let concurrentQueue = DispatchQueue(
     label: "com.app.cache",
@@ -394,7 +855,8 @@ for i in 4...5 {
 // 📖 Read 5 finished
 ```
 
-**Quando usar:**
+#### Quando usar:
+
 ```swift
 // ✅ Padrão Reader-Writer: muitas leituras + poucas escritas
 class Cache {
@@ -441,188 +903,7 @@ cache.set("key1", value: Data())
 
 ---
 
----
-
-## ⏱️ async vs sync
-
-Esse é um conceito **crítico** que confunde muita gente.
-
-```swift
-// ASYNC: returna imediatamente
-queue.async {
-    heavyWork()  // roda depois
-}
-print("continuei")  // imprime logo após async
-
-// SYNC: bloqueia até terminar
-queue.sync {
-    heavyWork()  // roda agora
-}
-print("continuei")  // imprime só depois de terminar
-```
-
-### Tabela Comparativa
-
-| Aspecto | async | sync |
-|---------|-------|------|
-| Retorno | Imediato | Bloqueia até terminar |
-| Caller | Continua | Espera |
-| Uso comum | Fire-and-forget | Obter resultado |
-| Segurança | Melhor (não bloqueia) | Perigosa (deadlock) |
-
-### 🧠 Entendendo: Onde Executa vs Quem Espera
-
-**O erro mais confuso:** "Se `DispatchQueue.global()` é outra thread, por que `.sync` congela a UI?"
-
-**Resposta:** `.sync` bloqueia a thread **CALLER** (quem chamou), não a thread onde o trabalho executa.
-
-```swift
-// Cenário: Você está na MAIN THREAD
-// viewDidLoad() = MAIN THREAD
-
-override func viewDidLoad() {
-    super.viewDidLoad()
-    print("🟢 Main thread: antes do sync")
-    
-    // ❌ PROBLEMA AQUI
-    DispatchQueue.global().sync {
-        // Trabalho executa em OUTRA thread (global)
-        // MAS main thread fica BLOQUEADA esperando
-        sleep(5)
-        print("💼 Global thread: trabalhando")
-    }
-    
-    print("🟢 Main thread: depois do sync")
-    // UI só atualiza DEPOIS de esperar 5 segundos
-}
-```
-
-#### 📊 Diagrama Visual: .sync vs .async
-
-**Cenário 1: `.sync` - Main Thread BLOQUEIA**
-
-```
-MAIN THREAD                    GLOBAL THREAD
-     │                              │
-     │ viewDidLoad()                │
-     │                              │
-     ├──┐                          │
-     │  │ DispatchQueue.global()   │
-     │  │      .sync { ... }       │
-     │  └─────────────────────────>│
-     │                              │ fetchNetwork()
-     │  ⏸️ BLOQUEADA               │ sleep(5)
-     │  (UI CONGELADA)              │ (trabalhando...)
-     │                              │
-     │<─────────────────────────────┤ retorna
-     │                              │
-     │ updateUI()                   │
-     │ (SÓ AGORA!)                  │
-     ▼                              ▼
-
-Tempo total: 5 segundos de UI congelada
-```
-
-**Cenário 2: `.async` - Main Thread CONTINUA**
-
-```
-MAIN THREAD                    GLOBAL THREAD
-     │                              │
-     │ viewDidLoad()                │
-     │                              │
-     ├──┐                          │
-     │  │ DispatchQueue.global()   │
-     │  │      .async { ... }      │
-     │  └─────────────────────────>│
-     │                              │ fetchNetwork()
-     │ ✅ CONTINUA                 │ sleep(5)
-     │ updateUI() imediatamente     │ (trabalhando...)
-     │ (UI RESPONSIVA)              │
-     │                              │
-     │                              │ terminou()
-     │<─────────────────────────────┤ callback
-     │ updateUI com resultado       │
-     ▼                              ▼
-
-Tempo: Main thread nunca bloqueia
-```
-
-### Exemplo Real: Carregamento de Dados
-
-```swift
-class ViewController: UIViewController {
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        // ❌ ERRADO: .sync BLOQUEIA main thread
-        print("🟢 Main: antes (.sync)")
-        DispatchQueue.global().sync {
-            print("💼 Global: começou fetch")
-            sleep(5)  // simula rede lenta
-            print("💼 Global: terminou fetch")
-        }
-        print("🟢 Main: depois (.sync)")
-        label.text = "Carregado"  // SÓ ATUALIZA DEPOIS DE 5s
-        
-        // Output:
-        // 🟢 Main: antes (.sync)
-        // 💼 Global: começou fetch
-        // [5 segundos de UI CONGELADA] ⏸️
-        // 💼 Global: terminou fetch
-        // 🟢 Main: depois (.sync)
-        // UI atualiza
-        
-        
-        // ✅ CERTO: .async NÃO BLOQUEIA
-        print("🟢 Main: antes (.async)")
-        DispatchQueue.global().async {
-            print("💼 Global: começou fetch")
-            sleep(5)  // simula rede lenta
-            print("💼 Global: terminou fetch")
-            
-            DispatchQueue.main.async {
-                print("🟢 Main: atualizando UI")
-                self.label.text = "Carregado"
-            }
-        }
-        print("🟢 Main: depois (.async) - UI RESPONSIVA!")
-        
-        // Output:
-        // 🟢 Main: antes (.async)
-        // 🟢 Main: depois (.async) - UI RESPONSIVA!
-        // 💼 Global: começou fetch
-        // [UI continua funcionando] ✅
-        // 💼 Global: terminou fetch
-        // 🟢 Main: atualizando UI
-    }
-}
-```
-
-#### 🎯 Regra de Ouro
-
-| Situação | Thread Caller | Queue Destino | Use | Resultado |
-|----------|--------------|---------------|-----|-----------|
-| Main → trabalho pesado | Main Thread | `.global()` | `.async` | UI não trava |
-| Main → trabalho pesado | Main Thread | `.global()` | `.sync` | ❌ UI CONGELA |
-| Background → atualizar UI | Background | `.main` | `.async` | ✅ Seguro |
-| Background → atualizar UI | Background | `.main` | `.sync` | ⚠️ Possível deadlock |
-
----
-
-## ⚠️ O Erro Mais Comum: Sync na Main Thread
-
-```swift
-// ❌ DEADLOCK GARANTIDO
-DispatchQueue.main.sync {
-    print("Isto nunca roda")
-}
-// Main thread tenta pedir à main queue
-// mas está bloqueado esperando por si mesmo
-```
-
----
-
-## 🎯 QoS (Quality of Service)
+## 🎯 QoS (Quality of Service) - Detalhado
 
 **QoS** é como você diz ao sistema operacional: *"Quão importante é este trabalho?"*
 
@@ -782,238 +1063,6 @@ DispatchQueue.global(qos: .background).async {
 
 ---
 
-## 🏗️ Como Funciona No iOS: Threads, Processos e Tasks
-
-### Hierarquia Completa
-
-```
-┌─────────────────────────────────────────────────────┐
-│             SISTEMA OPERACIONAL (iOS)               │
-│                                                     │
-│  ┌───────────────────────────────────────────────┐ │
-│  │          PROCESSO: Seu App                    │ │
-│  │                                               │ │
-│  │  ┌─────────────────────────────────────────┐ │ │
-│  │  │         MAIN THREAD (UI Thread)         │ │ │
-│  │  │  - Roda RunLoop                         │ │ │
-│  │  │  - Processa eventos de toque            │ │ │
-│  │  │  - Atualiza views (UIKit/SwiftUI)       │ │ │
-│  │  │  - DispatchQueue.main executa aqui      │ │ │
-│  │  └─────────────────────────────────────────┘ │ │
-│  │                                               │ │
-│  │  ┌─────────────────────────────────────────┐ │ │
-│  │  │         THREAD POOL (GCD)               │ │ │
-│  │  │                                         │ │ │
-│  │  │  Thread 1 ────> DispatchQueue.global() │ │ │
-│  │  │  Thread 2 ────> Custom Serial Queue    │ │ │
-│  │  │  Thread 3 ────> Custom Concurrent Queue│ │ │
-│  │  │  Thread 4 ────> (idle)                 │ │ │
-│  │  │  Thread 5 ────> (idle)                 │ │ │
-│  │  │  ...                                    │ │ │
-│  │  └─────────────────────────────────────────┘ │ │
-│  │                                               │ │
-│  │  Memória Compartilhada:                       │ │
-│  │  - Heap (objetos, arrays, etc)               │ │
-│  │  - Todas threads acessam mesma memória        │ │
-│  │    (por isso precisamos sincronização!)       │ │
-│  └───────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
-```
-
-### 🧵 Threads vs Processos vs Tasks
-
-```swift
-// PROCESSO = Seu app inteiro
-// - Tem memória isolada do resto do sistema
-// - iOS cria um processo quando você abre o app
-
-// THREAD = Linha de execução dentro do processo
-// - Todas threads compartilham a MESMA memória
-// - iOS cria automaticamente:
-//   1. Main Thread (para UI)
-//   2. Thread Pool (para GCD)
-
-// DISPATCH QUEUE = Fila que distribui trabalho para threads
-DispatchQueue.main        // usa Main Thread
-DispatchQueue.global()    // usa qualquer thread do pool
-
-// TASK (Swift Concurrency) = Unidade de trabalho assíncrono
-Task {
-    // Gerenciado pelo executor do Swift Concurrency
-    // Mais abstrato que threads
-}
-```
-
-#### Exemplo Visual: Múltiplas Threads Executando
-
-```swift
-print("App iniciou")
-
-// Main Thread
-DispatchQueue.main.async {
-    print("🟢 Main Thread: ID = \(Thread.current)")
-    // Output: 🟢 Main Thread: ID = <_NSMainThread: 0x600...>{number = 1}
-}
-
-// Global Queue (pega thread do pool)
-DispatchQueue.global().async {
-    print("🔵 Global Thread 1: ID = \(Thread.current)")
-    // Output: 🔵 Global Thread 1: ID = <NSThread: 0x600...>{number = 3}
-}
-
-DispatchQueue.global().async {
-    print("🟣 Global Thread 2: ID = \(Thread.current)")
-    // Output: 🟣 Global Thread 2: ID = <NSThread: 0x600...>{number = 5}
-}
-
-// Custom Serial Queue (pega thread do pool)
-let serialQueue = DispatchQueue(label: "com.app.serial")
-serialQueue.async {
-    print("🟡 Serial Thread: ID = \(Thread.current)")
-    // Output: 🟡 Serial Thread: ID = <NSThread: 0x600...>{number = 7}
-}
-
-// Output completo:
-// App iniciou
-// 🟢 Main Thread: ID = <_NSMainThread...>{number = 1}
-// 🔵 Global Thread 1: ID = <NSThread...>{number = 3}
-// 🟣 Global Thread 2: ID = <NSThread...>{number = 5}
-// 🟡 Serial Thread: ID = <NSThread...>{number = 7}
-```
-
-### 🎯 Diferença Crucial: DispatchQueue vs Thread
-
-```
-❌ ERRADO (modelo mental incorreto):
-DispatchQueue.global() = "cria nova thread"
-DispatchQueue.main = "cria thread da UI"
-
-✅ CERTO (modelo mental correto):
-DispatchQueue.global() = "enfileira trabalho para SER executado 
-                          em alguma thread disponível no pool"
-
-DispatchQueue.main = "enfileira trabalho para SER executado 
-                      na main thread (que já existe)"
-```
-
-**Analogia:**
-- **Thread** = Trabalhador (humano)
-- **DispatchQueue** = Fila de tarefas na mesa do trabalhador
-- **Work Item** = Tarefa específica (closure)
-
-```
-Main Thread (trabalhador 1):
-  📋 Fila: [renderizar view, processar touch, ...]
-  
-Thread Pool (trabalhadores 2-8):
-  📋 Fila Global: [download, processamento, ...]
-  📋 Fila Serial DB: [write, read, delete, ...]
-```
-
-### 🔬 Experimento: Rastreando Threads
-
-```swift
-func trackThread(label: String) {
-    let threadID = Thread.current
-    let isMain = Thread.isMainThread
-    print("\(label)")
-    print("  Thread: \(threadID)")
-    print("  É main? \(isMain)")
-    print("  Name: \(Thread.current.name ?? "unnamed")")
-    print("")
-}
-
-// Teste 1: Main
-trackThread(label: "1️⃣ Main directly")
-
-// Teste 2: DispatchQueue.main
-DispatchQueue.main.async {
-    trackThread(label: "2️⃣ DispatchQueue.main")
-}
-
-// Teste 3: Global
-DispatchQueue.global().async {
-    trackThread(label: "3️⃣ DispatchQueue.global()")
-}
-
-// Teste 4: Custom Serial
-let serial = DispatchQueue(label: "com.app.serial")
-serial.async {
-    trackThread(label: "4️⃣ Custom Serial")
-}
-
-// Teste 5: Custom Concurrent
-let concurrent = DispatchQueue(label: "com.app.concurrent", attributes: .concurrent)
-concurrent.async {
-    trackThread(label: "5️⃣ Custom Concurrent")
-}
-
-// Output:
-// 1️⃣ Main directly
-//   Thread: <_NSMainThread: 0x600...>{number = 1}
-//   É main? true
-//   Name: (main)
-//
-// 2️⃣ DispatchQueue.main
-//   Thread: <_NSMainThread: 0x600...>{number = 1}  ← MESMA thread que 1️⃣
-//   É main? true
-//   Name: (main)
-//
-// 3️⃣ DispatchQueue.global()
-//   Thread: <NSThread: 0x600...>{number = 3}
-//   É main? false
-//   Name: (unnamed)
-//
-// 4️⃣ Custom Serial
-//   Thread: <NSThread: 0x600...>{number = 5}
-//   É main? false
-//   Name: (unnamed)
-//
-// 5️⃣ Custom Concurrent
-//   Thread: <NSThread: 0x600...>{number = 7}
-//   É main? false
-//   Name: (unnamed)
-```
-
-### 📊 Resumo Visual: Fluxo Completo
-
-```
-   Seu Código
-       ↓
-DispatchQueue.global().async {
-    heavyWork()
-}
-       ↓
-  ┌─────────┐
-  │   GCD   │ (Scheduler do Sistema)
-  └────┬────┘
-       ↓
-  Escolhe thread do pool
-       ↓
-  ┌──────────────┐
-  │ Thread #3    │ ← executa heavyWork()
-  │ (do pool)    │
-  └──────────────┘
-       ↓
-  volta ao pool (idle)
-```
-
-**Enquanto isso:**
-
-```
-  ┌──────────────┐
-  │ Main Thread  │ ← continua processando UI
-  │ (number = 1) │   (se você usou .async)
-  └──────────────┘
-       ou
-  ┌──────────────┐
-  │ Main Thread  │ ← BLOQUEADA esperando
-  │ (BLOCKED)    │   (se você usou .sync)
-  └──────────────┘
-```
-
----
-
 ## 🔄 Delay e Scheduling
 
 ```swift
@@ -1025,112 +1074,6 @@ DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
 let deadline = DispatchTime.now() + .seconds(5)
 DispatchQueue.main.asyncAfter(deadline: deadline) {
     print("5 segundos depois")
-}
-```
-
----
-
-## 🧵 O Que é Thread Pool?
-
-**Thread Pool** é um conjunto gerenciado de threads reutilizáveis criado pelo sistema operacional.
-
-### Conceito Fundamental
-
-Ao invés de **criar uma nova thread** cada vez que uma tarefa precisa rodar:
-
-```swift
-// ❌ Sem thread pool (pthread manual)
-pthread_create(&thread, NULL, work1, NULL)  // cria thread 1
-pthread_create(&thread, NULL, work2, NULL)  // cria thread 2
-pthread_create(&thread, NULL, work3, NULL)  // cria thread 3
-// Custoso: criar/destruir threads é caro (syscall, stack allocation)
-```
-
-O sistema mantém um **pool de threads prontas** para reutilizar:
-
-```swift
-// ✅ Com thread pool (GCD)
-DispatchQueue.global().async { work1() }  // reutiliza thread A
-DispatchQueue.global().async { work2() }  // reutiliza thread B
-DispatchQueue.global().async { work3() }  // reutiliza thread A (já está disponível)
-// Eficiente: threads já existem, apenas pegamos uma disponível
-```
-
-### Como Funciona no GCD
-
-```
-        Application Code
-               ↓
-    DispatchQueue.global().async { work }
-               ↓
-          ┌─────────┐
-          │   GCD   │ (scheduler do sistema)
-          └────┬────┘
-               ↓
-    ╔═════════════════════╗
-    ║    THREAD POOL      ║
-    ╠═════════════════════╣
-    ║  Thread 1: [BUSY]   ║ ← executando work1
-    ║  Thread 2: [IDLE]   ║ ← disponível
-    ║  Thread 3: [BUSY]   ║ ← executando work2
-    ║  Thread 4: [IDLE]   ║ ← disponível
-    ║         ...         ║
-    ╚═════════════════════╝
-             ↓
-    Sistema aloca work para thread idle
-```
-
-### Decisões do Sistema
-
-O **número de threads no pool** é gerenciado dinamicamente:
-
-```swift
-// Sistema considera:
-// 1. Número de cores da CPU
-// 2. QoS da tarefa (userInteractive vs background)
-// 3. Carga atual do sistema
-// 4. Trabalho em execução vs bloqueado (I/O, sleep)
-
-// Exemplo: iPhone com 6 cores
-// - Global queue (QoS .userInitiated): ~6-8 threads ativas
-// - Global queue (QoS .background): ~2-4 threads ativas
-// Sistema ajusta para evitar overcommit (threads demais = slowdown)
-```
-
-### Por Que Isso Importa?
-
-**1. Thread Explosion (anti-pattern):**
-```swift
-// ❌ PERIGO: criar 1000 queues serial = saturar o pool
-for i in 0..<1000 {
-    let queue = DispatchQueue(label: "queue\(i)")
-    queue.async { longTask() }
-}
-// Sistema pode criar 1000 threads → context switching → lentidão
-```
-
-**2. Thread Pool Saturation:**
-```swift
-// ❌ Bloquear muitas threads com sync
-for i in 0..<64 {
-    DispatchQueue.global().async {
-        semaphore.wait()  // bloqueia thread
-        // thread fica esperando, não volta ao pool
-    }
-}
-// Pool esgota → novas tarefas esperam → starvation
-```
-
-**3. Uso Correto:**
-```swift
-// ✅ Poucos serial queues para isolamento
-let dbQueue = DispatchQueue(label: "com.app.db")
-let networkQueue = DispatchQueue(label: "com.app.net")
-let cacheQueue = DispatchQueue(label: "com.app.cache", attributes: .concurrent)
-
-// ✅ Global queues para fire-and-forget
-DispatchQueue.global(qos: .utility).async {
-    processData()  // thread volta ao pool quando terminar
 }
 ```
 
