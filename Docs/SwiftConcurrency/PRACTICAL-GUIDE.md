@@ -115,6 +115,25 @@ actor FileStorage {
 
 ---
 
+## Toolkit de Swift Concurrency (quando usar)
+
+| Ferramenta | Use quando |
+|-----------|------------|
+| `async/await` | I/O assíncrono simples e fluxo linear de leitura
+| `async let` | Poucas operacoes independentes em paralelo (numero fixo)
+| `Task` | Iniciar trabalho async a partir de contexto sincrono
+| `TaskGroup` | Paralelizar uma quantidade variavel de trabalhos
+| `actor` | Proteger estado mutavel com isolamento automatico
+| `@MainActor` | Garantir UI e estado visual na thread principal
+| `Sendable` | Garantir seguranca de dados entre tarefas/atores
+| `@Sendable` | Fechar sobre valores de forma segura em closures concorrentes
+| `Continuations` | Fazer bridge de APIs antigas de callback para async/await
+| `AsyncSequence` | Consumir valores ao longo do tempo (streams)
+| `AsyncStream` | Criar streams manualmente (delegates, callbacks)
+| `AsyncAlgorithms` | Combinar/transformar streams (debounce, merge, etc.)
+
+---
+
 ## Introdução - Por que Swift Concurrency?
 
 ### O Problema que Swift Concurrency Resolve
@@ -6727,6 +6746,18 @@ Use este checklist ao revisar código com Swift Concurrency:
 | Debounce | `Task.sleep` | `try await Task.sleep(nanoseconds: 400_000_000)` |
 | Proteger estado | `actor` | `actor Repository` |
 | UI thread | `@MainActor` | `@MainActor func update()` |
+| Prioridade | `Task(priority:)` | `Task(priority: .userInitiated) { }` |
+| Contexto por task | `@TaskLocal` | `@TaskLocal static var userID` |
+| Legacy com dependencias | `OperationQueue` | `opB.addDependency(opA)` |
+
+### Legacy → Modern (mapeamento rapido)
+
+| Legado | Substituto moderno |
+|--------|--------------------|
+| Callback + GCD | `async/await` + `Task` |
+| `DispatchGroup` | `withTaskGroup` ou `async let` |
+| `DispatchSemaphore` | `actor` ou isolamento | 
+| `OperationQueue` | `Task`/`TaskGroup` (a nao ser que precise de deps/KVO) |
 
 ### Common Patterns
 
@@ -6903,6 +6934,10 @@ Swift Concurrency transformou a forma como escrevemos código assíncrono em Swi
 - [ASYNC-SEQUENCES.md](References/ASYNC-SEQUENCES.md)
 - [MEMORY-MANAGEMENT.md](References/MEMORY-MANAGEMENT.md)
 - [TESTING.md](References/TESTING.md)
+
+### External References
+- https://bugfender.com/blog/swift-concurrency/
+- https://www.emergetools.com/blog/posts/swift-async-await-the-full-toolkit
 
 ---
 

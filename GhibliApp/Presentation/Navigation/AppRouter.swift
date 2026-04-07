@@ -29,10 +29,7 @@ final class AppRouter {
 
 	func push(_ route: AppRoute, on tab: Tab? = nil) {
 		let targetTab = tab ?? selectedTab
-		if paths[targetTab] == nil {
-			paths[targetTab] = NavigationPath()
-		}
-		paths[targetTab]?.append(route)
+		paths[targetTab, default: NavigationPath()].append(route)
 		selectedTab = targetTab
 	}
 

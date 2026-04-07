@@ -25,20 +25,18 @@ actor SwiftDataAdapter: ModelActor, StorageAdapter {
 
 	nonisolated let modelExecutor: any ModelExecutor
 	nonisolated let modelContainer: ModelContainer
+	private let context: ModelContext
 	
 	private init() {
 		do {
 			let container = try ModelContainer(for: CachedPayload.self)
 			self.modelContainer = container
 			let context = ModelContext(container)
-			self.modelExecutor = DefaultSerialExecutor()
+			self.context = context
+			self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
 		} catch {
 			fatalError("Failed to create SwiftData container: \(error)")
 		}
-	}
-
-	private var context: ModelContext { 
-		ModelContext(modelContainer)
 	}
 
 	func save<T: Codable & Sendable>(_ value: T, for key: String) async throws {

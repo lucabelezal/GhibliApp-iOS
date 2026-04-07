@@ -43,6 +43,20 @@ func processarDados() async throws {
 }
 ```
 
+## O que acontece em um await
+
+Quando o codigo chega a um `await`, o runtime pode **suspender** a funcao e salvar seu estado em um **async frame** no heap. Isso libera a thread atual para executar outro trabalho enquanto a operacao aguardada termina.
+
+```
+async function
+    ├─ executa ate await
+    ├─ salva estado (async frame)
+    ├─ libera thread
+    └─ retoma quando o resultado fica disponivel
+```
+
+**Consequencia:** `await` nao bloqueia a thread. Ele suspende a funcao e permite progresso em outras tarefas.
+
 ## Ordem de Execução
 
 Concorrência estruturada executa de cima para baixo na ordem esperada:

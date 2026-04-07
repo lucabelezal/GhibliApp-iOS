@@ -4,7 +4,7 @@ final class AppContainer {
 	static let shared = AppContainer()
 
 	@MainActor
-	let router: AppRouter
+	lazy var router: AppRouter = AppRouter()
 	private let fetchFilmsUseCase: FetchFilmsUseCase
 	private let fetchPeopleUseCase: FetchPeopleUseCase
 	private let fetchLocationsUseCase: FetchLocationsUseCase
@@ -59,8 +59,6 @@ final class AppContainer {
 		self.observeConnectivityUseCase = ObserveConnectivityUseCase(
 			repository: connectivityRepository
 		)
-
-		self.router = AppRouter()
 
 		syncStartTask = Task(priority: .utility) { [syncManager] in
 			await syncManager.start()
