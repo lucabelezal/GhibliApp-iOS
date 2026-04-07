@@ -1,9 +1,8 @@
 import Foundation
 
-struct FilmRepository: FilmRepositoryProtocol {
+actor FilmRepository: FilmRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
-	private let cacheKey = "films.catalog"
 
 	init(client: some HTTPClient & Sendable, cache: StorageAdapter) {
 		self.client = client
@@ -12,12 +11,12 @@ struct FilmRepository: FilmRepositoryProtocol {
 
 	func fetchFilms(forceRefresh: Bool) async throws -> [Film] {
 		if !forceRefresh,
-		   let cached: [FilmDTO] = try await cache.load([FilmDTO].self, for: cacheKey) {
+		   let cached: [FilmDTO] = try await cache.load([FilmDTO].self, for: CacheKeys.filmsCatalog) {
 			return cached.map(FilmMapper.map)
 		}
 
 		let dtos: [FilmDTO] = try await client.request(with: FilmEndpoint.list)
-		try await cache.save(dtos, for: cacheKey)
+		try await cache.save(dtos, for: CacheKeys.filmsCatalog)
 		return dtos.map(FilmMapper.map)
 	}
 

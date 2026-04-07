@@ -1,6 +1,6 @@
 import Foundation
 
-struct CacheRepository: CacheRepositoryProtocol {
+actor CacheRepository: CacheRepositoryProtocol {
 	private let storage: StorageAdapter
 
 	init(storage: StorageAdapter) {

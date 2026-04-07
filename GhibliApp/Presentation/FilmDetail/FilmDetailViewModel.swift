@@ -63,15 +63,37 @@ final class FilmDetailViewModel {
 		async let species = fetchSpeciesUseCase.execute(for: film, forceRefresh: forceRefresh)
 		async let vehicles = fetchVehiclesUseCase.execute(for: film, forceRefresh: forceRefresh)
 
-		let peopleResult = try? await people
-		let locationsResult = try? await locations
-		let speciesResult = try? await species
-		let vehiclesResult = try? await vehicles
-
-		if let peopleResult { charactersSectionViewModel.setItems(peopleResult) }
-		if let locationsResult { locationsSectionViewModel.setItems(locationsResult) }
-		if let speciesResult { speciesSectionViewModel.setItems(speciesResult) }
-		if let vehiclesResult { vehiclesSectionViewModel.setItems(vehiclesResult) }
+		// People
+		do {
+			let peopleResult = try await people
+			charactersSectionViewModel.setItems(peopleResult)
+		} catch {
+			charactersSectionViewModel.setError(error)
+		}
+		
+		// Locations
+		do {
+			let locationsResult = try await locations
+			locationsSectionViewModel.setItems(locationsResult)
+		} catch {
+			locationsSectionViewModel.setError(error)
+		}
+		
+		// Species
+		do {
+			let speciesResult = try await species
+			speciesSectionViewModel.setItems(speciesResult)
+		} catch {
+			speciesSectionViewModel.setError(error)
+		}
+		
+		// Vehicles
+		do {
+			let vehiclesResult = try await vehicles
+			vehiclesSectionViewModel.setItems(vehiclesResult)
+		} catch {
+			vehiclesSectionViewModel.setError(error)
+		}
 	}
 
 	func toggleFavorite() async {

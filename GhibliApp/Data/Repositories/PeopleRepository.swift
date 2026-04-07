@@ -1,6 +1,6 @@
 import Foundation
 
-struct PeopleRepository: PeopleRepositoryProtocol {
+actor PeopleRepository: PeopleRepositoryProtocol {
 	private let client: any HTTPClient & Sendable
 	private let cache: StorageAdapter
 	private let baseURL: URL
@@ -16,7 +16,7 @@ struct PeopleRepository: PeopleRepositoryProtocol {
 	}
 
 	func fetchPeople(for film: Film, forceRefresh: Bool) async throws -> [Person] {
-		let key = "people." + film.id
+		let key = CacheKeys.people(filmId: film.id)
 		if !forceRefresh, let cached: [PersonDTO] = try await cache.load([PersonDTO].self, for: key) {
 			return cached.map(PersonMapper.map)
 		}
@@ -49,7 +49,9 @@ struct PeopleRepository: PeopleRepositoryProtocol {
 			let httpClient = client
 			try await withThrowingTaskGroup(of: PersonDTO?.self) { group in
 				for url in detailURLs {
+					try Task.checkCancellation()
 					group.addTask {
+						try Task.checkCancellation()
 						do {
 							return try await httpClient.request(with: GhibliEndpoint.absolute(url))
 						} catch {

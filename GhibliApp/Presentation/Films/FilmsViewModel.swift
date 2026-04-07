@@ -109,15 +109,17 @@ final class FilmsViewModel {
 
 	private func listenToConnectivity() {
 		connectivityTask?.cancel()
-		connectivityTask = Task { [weak self, observeConnectivityUseCase] in
-			for await isConnected in observeConnectivityUseCase.stream {
+		let stream = observeConnectivityUseCase.stream
+		connectivityTask = Task { [weak self] in
+			for await isConnected in stream {
 				guard !Task.isCancelled else { break }
-				guard let self else { return }
-				self.handleConnectivityChange(isConnected: isConnected)
+				await MainActor.run { [weak self] in
+					self?.handleConnectivityChange(isConnected: isConnected)
+				}
 			}
 
-			if let self {
-				self.clearConnectivityTaskReference()
+			await MainActor.run { [weak self] in
+				self?.clearConnectivityTaskReference()
 			}
 		}
 	}

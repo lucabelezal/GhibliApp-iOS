@@ -13,6 +13,15 @@ struct SplashView: View {
 			splashContent
 		}
 		.onAppear(perform: handleAppear)
+		.task {
+			do {
+				try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+				guard !Task.isCancelled else { return }
+				onFinished()
+			} catch {
+				// Task was cancelled
+			}
+		}
 	}
 }
 
@@ -45,9 +54,6 @@ extension SplashView {
 
 	private func handleAppear() {
 		isAnimating = true
-		DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-			onFinished()
-		}
 	}
 }
 

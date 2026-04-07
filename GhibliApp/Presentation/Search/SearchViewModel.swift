@@ -16,6 +16,8 @@ final class SearchViewModel {
 	private var searchTask: Task<Void, Never>?
 	@ObservationIgnored
 	private var connectivityTask: Task<Void, Never>?
+	@ObservationIgnored
+	private var currentSearchID: UUID?
 	private var isOffline = false
 
 	init(
@@ -41,13 +43,18 @@ final class SearchViewModel {
 		searchTask?.cancel()
 		guard newValue.isEmpty == false else {
 			state = .idle
+			currentSearchID = nil
 			return
 		}
 
-		searchTask = Task { [weak self] in
+		let searchID = UUID()
+		currentSearchID = searchID
+		searchTask = Task { [weak self, searchID] in
 			try? await Task.sleep(nanoseconds: 400_000_000)
-			guard !Task.isCancelled, let self else { return }
-			await self.performSearch(query: newValue)
+			guard !Task.isCancelled, 
+				  let self,
+				  self.currentSearchID == searchID else { return }
+			await self.performSearch(query: newValue, searchID: searchID)
 			self.clearSearchTask()
 		}
 	}
@@ -61,13 +68,18 @@ final class SearchViewModel {
 		}
 	}
 
-	private func performSearch(query: String) async {
+	private func performSearch(query: String, searchID: UUID) async {
 		guard isOffline == false else {
-			state = .error(.offline(message: "Sem conexão para buscar filmes"))
+			if currentSearchID == searchID {
+				state = .error(.offline(message: "Sem conexão para buscar filmes"))
+			}
 			return
 		}
 
-		state = .loading
+		if currentSearchID == searchID {
+			state = .loading
+		}
+		
 		do {
 			async let filmsTask = fetchFilmsUseCase.execute(forceRefresh: true)
 			async let favoritesTask = getFavoritesUseCase.execute()
@@ -75,8 +87,13 @@ final class SearchViewModel {
 			let favorites = try await favoritesTask
 			let filtered = films.filter { $0.title.localizedCaseInsensitiveContains(query) }
 			let content = SearchViewContent(results: filtered, favoriteIDs: favorites)
+			
+			// Only apply results if this is still the current search
+			guard currentSearchID == searchID else { return }
 			state = filtered.isEmpty ? .empty : .loaded(content)
 		} catch {
+			// Only apply error if this is still the current search
+			guard currentSearchID == searchID else { return }
 			state = .error(.from(error))
 		}
 	}
@@ -115,9 +132,13 @@ final class SearchViewModel {
 		}
 
 		searchTask?.cancel()
-		searchTask = Task { [weak self] in
-			guard !Task.isCancelled, let self else { return }
-			await self.performSearch(query: self.query)
+		let searchID = UUID()
+		currentSearchID = searchID
+		searchTask = Task { [weak self, searchID] in
+			guard !Task.isCancelled, 
+				  let self,
+				  self.currentSearchID == searchID else { return }
+			await self.performSearch(query: self.query, searchID: searchID)
 			self.clearSearchTask()
 		}
 	}

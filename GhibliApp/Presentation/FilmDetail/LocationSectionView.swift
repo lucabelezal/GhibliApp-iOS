@@ -1,8 +1,13 @@
+import Observation
 import SwiftUI
 
 struct LocationSectionView: View {
-	@ObservedObject
+	@Bindable
 	var viewModel: FilmDetailSectionViewModel<Location>
+
+	init(viewModel: FilmDetailSectionViewModel<Location>) {
+		self._viewModel = Bindable(viewModel)
+	}
 
 	var body: some View {
 		FilmDetailCarouselSectionView(

@@ -1,6 +1,7 @@
 import Observation
 import SwiftUI
 
+@MainActor
 @Observable
 final class AppRouter {
 	enum Tab: Hashable {
@@ -28,9 +29,7 @@ final class AppRouter {
 
 	func push(_ route: AppRoute, on tab: Tab? = nil) {
 		let targetTab = tab ?? selectedTab
-		var path = paths[targetTab] ?? NavigationPath()
-		path.append(route)
-		paths[targetTab] = path
+		paths[targetTab, default: NavigationPath()].append(route)
 		selectedTab = targetTab
 	}
 

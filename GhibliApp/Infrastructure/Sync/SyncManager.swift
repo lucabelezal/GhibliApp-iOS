@@ -44,8 +44,7 @@ actor SyncManager {
 	}
 
 	private func initializeState() async {
-		// FeatureFlags é @MainActor; acessar via await mantém segurança.
-		state = await FeatureFlags.syncEnabled ? .idle : .disabled
+		state = FeatureFlags.syncEnabled ? .idle : .disabled
 	}
 
 	private func observeConnectivityAndSync() async {
@@ -54,7 +53,7 @@ actor SyncManager {
 			if Task.isCancelled {
 				break
 			}
-			if !(await FeatureFlags.syncEnabled) {
+			if !FeatureFlags.syncEnabled {
 				state = .disabled
 				continue
 			}
@@ -68,7 +67,7 @@ actor SyncManager {
 		if Task.isCancelled {
 			return
 		}
-		guard await FeatureFlags.syncEnabled else {
+		guard FeatureFlags.syncEnabled else {
 			state = .disabled
 			return
 		}

@@ -10,6 +10,12 @@ import Foundation
 // swiftlint:disable explicit_type_interface function_parameter_count identifier_name line_length
 // swiftlint:disable nesting type_body_length type_name vertical_whitespace_opening_braces
 internal enum L10n {
+  internal enum Accessibility {
+    /// Accessibility
+    internal nonisolated static let addFavorite = L10n.tr("Localizable", "accessibility.add_favorite", fallback: "Adicionar aos favoritos")
+    /// Remover dos favoritos
+    internal nonisolated static let removeFavorite = L10n.tr("Localizable", "accessibility.remove_favorite", fallback: "Remover dos favoritos")
+  }
   internal enum Connectivity {
     /// Connectivity
     internal nonisolated static let connected = L10n.tr("Localizable", "connectivity.connected", fallback: "Conexão restabelecida")

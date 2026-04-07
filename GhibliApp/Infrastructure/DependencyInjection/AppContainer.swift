@@ -1,10 +1,10 @@
 import Foundation
 
-@MainActor
 final class AppContainer {
 	static let shared = AppContainer()
 
-	let router: AppRouter
+	@MainActor
+	lazy var router: AppRouter = AppRouter()
 	private let fetchFilmsUseCase: FetchFilmsUseCase
 	private let fetchPeopleUseCase: FetchPeopleUseCase
 	private let fetchLocationsUseCase: FetchLocationsUseCase
@@ -60,9 +60,7 @@ final class AppContainer {
 			repository: connectivityRepository
 		)
 
-		self.router = AppRouter()
-
-		syncStartTask = Task.detached(priority: .utility) { [syncManager] in
+		syncStartTask = Task(priority: .utility) { [syncManager] in
 			await syncManager.start()
 		}
 	}
@@ -139,6 +137,7 @@ final class AppContainer {
 		syncStartTask?.cancel()
 	}
 
+	@MainActor
 	func makeFilmsViewModel() -> FilmsViewModel {
 		FilmsViewModel(
 			fetchFilmsUseCase: fetchFilmsUseCase,
@@ -148,6 +147,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeFilmDetailViewModel(film: Film) -> FilmDetailViewModel {
 		FilmDetailViewModel(
 			film: film,
@@ -160,6 +160,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeFavoritesViewModel() -> FavoritesViewModel {
 		FavoritesViewModel(
 			fetchFilmsUseCase: fetchFilmsUseCase,
@@ -168,6 +169,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeSearchViewModel() -> SearchViewModel {
 		SearchViewModel(
 			fetchFilmsUseCase: fetchFilmsUseCase,
@@ -177,6 +179,7 @@ final class AppContainer {
 		)
 	}
 
+	@MainActor
 	func makeSettingsViewModel() -> SettingsViewModel {
 		SettingsViewModel(
 			clearCacheUseCase: clearCacheUseCase,
