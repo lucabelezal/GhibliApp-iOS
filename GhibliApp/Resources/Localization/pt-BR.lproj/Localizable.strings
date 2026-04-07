@@ -2,6 +2,10 @@
 "connectivity.connected" = "Conexão restabelecida";
 "connectivity.disconnected" = "Sem conexão";
 
+/* Accessibility */
+"accessibility.add_favorite" = "Adicionar aos favoritos";
+"accessibility.remove_favorite" = "Remover dos favoritos";
+
 /* Errors - Domain */
 "errors.domain.could_not_parse" = "Não foi possível converter os dados.";
 "errors.domain.no_connectivity" = "Sem conexão.";
